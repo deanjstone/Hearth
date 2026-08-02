@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test'
+import { expect, test } from 'vitest'
 import { parseUnifiedDiff } from './git-diff.js'
 
 test('parses a modified file with adds, dels, and context', () => {

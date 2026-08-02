@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test'
+import { expect, test } from 'vitest'
 import { readBlock, upsertBlock } from './managed-block.js'
 import { compileSoul } from './soul.js'
 

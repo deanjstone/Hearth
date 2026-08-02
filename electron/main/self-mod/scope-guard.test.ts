@@ -1,4 +1,4 @@
-import { test, expect, describe } from 'bun:test'
+import { test, expect, describe } from 'vitest'
 import os from 'node:os'
 import path from 'node:path'
 import { classifyWrite, isCanvasPath } from './scope-guard'

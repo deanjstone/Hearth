@@ -1,4 +1,4 @@
-import { test, expect, describe } from 'bun:test'
+import { test, expect, describe } from 'vitest'
 import { decidePermission, type PermissionContext } from './permission-policy'
 import type { PermissionRequest } from '../../electron/shared/protocol'
 

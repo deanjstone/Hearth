@@ -1,4 +1,4 @@
-import { test, expect, describe } from 'bun:test'
+import { test, expect, describe } from 'vitest'
 import { AcpAgent } from './acp-agent.js'
 
 // A minimal ACP adapter: answers initialize over ndjson stdio, then either

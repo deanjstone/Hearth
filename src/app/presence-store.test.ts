@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, test } from 'vitest'
 import { changedRange, usePresence, getPresence, FRESH_PRESENCE, throttledStorage } from './presence-store'
 import { aggregateStatus } from '@/shell/Presence'
 import type { SessionUpdate } from '../../electron/shared/protocol'

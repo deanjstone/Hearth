@@ -1,4 +1,4 @@
-import { test, expect, describe } from 'bun:test'
+import { test, expect, describe } from 'vitest'
 import { FakeAgent } from './fake.js'
 import type { SessionUpdate } from './agent.js'
 

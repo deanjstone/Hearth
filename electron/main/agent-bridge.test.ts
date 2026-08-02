@@ -1,11 +1,42 @@
-import { test, expect, afterEach } from 'bun:test'
+import { test, expect, afterEach } from 'vitest'
 import { mkdtempSync, rmSync, readFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { request as httpRequest } from 'node:http'
 import { startAgentBridge, type AgentBridgeDeps } from './agent-bridge'
 
 let stop: (() => void) | null = null
 let dir: string | null = null
+
+// `Host` is a forbidden header per the Fetch spec: undici (Node's fetch) silently
+// overrides any caller-supplied value with the real target authority, so fetch()
+// cannot simulate a spoofed Host the way Bun's fetch could. node:http's raw
+// request API has no such restriction, so the two rebinding-shape tests below use
+// it instead — this exercises the real Host-header threat model, not a fetch quirk.
+function requestWithRawHost(
+  url: string,
+  options: { method?: string; headers?: Record<string, string>; body?: string },
+): Promise<{ status: number }> {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url)
+    const req = httpRequest(
+      {
+        hostname: u.hostname,
+        port: u.port,
+        path: `${u.pathname}${u.search}`,
+        method: options.method ?? 'GET',
+        headers: options.headers,
+      },
+      (res) => {
+        res.resume()
+        res.on('end', () => resolve({ status: res.statusCode ?? 0 }))
+      },
+    )
+    req.on('error', reject)
+    if (options.body) req.write(options.body)
+    req.end()
+  })
+}
 
 afterEach(() => {
   if (stop) stop()
@@ -50,7 +81,7 @@ test('a valid token passes the auth gate (then routes normally)', async () => {
 // loopback host, with no browser Origin, get past the front door.
 test('a valid token with a foreign Host (rebinding shape) is rejected', async () => {
   const { base, token } = await boot()
-  const res = await fetch(`${base}/snapshot`, {
+  const res = await requestWithRawHost(`${base}/snapshot`, {
     headers: { 'x-hearth-token': token, host: 'attacker.example' },
   })
   expect(res.status).toBe(403)
@@ -73,9 +104,9 @@ test('correct Host + valid token is served exactly as before', async () => {
 
 test('a wrong Host with a wrong token still fails closed (403 before 401)', async () => {
   const { base } = await boot()
-  const res = await fetch(`${base}/eval`, {
+  const res = await requestWithRawHost(`${base}/eval`, {
     method: 'POST',
-    headers: { host: 'attacker.example' },
+    headers: { host: 'attacker.example', 'content-type': 'application/json' },
     body: JSON.stringify({ code: '1' }),
   })
   expect(res.status).toBe(403)

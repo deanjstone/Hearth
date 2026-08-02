@@ -3,6 +3,11 @@ packages:
 
 allowBuilds:
   dugite: true
-  electron-winstaller: set this to true or false
-  esbuild: set this to true or false
   node-pty: true
+  # Packaging is out of scope for this dev-mode-only port (see map Destination);
+  # electron-winstaller's build script is Windows-installer-only and unneeded.
+  electron-winstaller: false
+  # esbuild ships prebuilt platform binaries via optionalDependencies; its
+  # postinstall is a no-op verification step on linux-x64, confirmed working
+  # (`esbuild --version`) without running it.
+  esbuild: false

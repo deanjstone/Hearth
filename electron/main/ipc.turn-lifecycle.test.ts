@@ -5,7 +5,7 @@
 //
 // The handler is driven unmodified: `electron`, the pty manager (native
 // node-pty is built for Electron's ABI, not bun's), and the overlay client
-// (fire-and-forget HTTP) are replaced via mock.module; every self-mod /
+// (fire-and-forget HTTP) are replaced via vi.mock; every self-mod /
 // host / session boundary records into one shared call log so ordering is
 // asserted across all of them at once.
 //
@@ -13,17 +13,25 @@
 // directly observable — beginRun is pinned via its immediate neighbor
 // selfMod.beginTurn, endRun via its observable effects (overlay.apply + the
 // lane-clearing selfModActivity broadcast).
-import { test, expect, describe, beforeEach, mock } from 'bun:test'
+//
+// vi.mock factories are hoisted above this file's top-level code, so
+// anything they close over (handlers/log/sent) must come from vi.hoisted()
+// rather than a plain top-level const — otherwise vitest throws on the
+// out-of-scope reference.
+import { test, expect, describe, beforeEach, vi } from 'vitest'
 
 interface Sent {
   channel: string
   payload: unknown
 }
 
-const log: string[] = []
-const sent: Sent[] = []
+const { handlers, log, sent } = vi.hoisted(() => ({
+  handlers: new Map<string, (...args: unknown[]) => unknown>(),
+  log: [] as string[],
+  sent: [] as Sent[],
+}))
 
-mock.module('electron', () => ({
+vi.mock('electron', () => ({
   app: { on: () => {}, getPath: () => '/tmp', getVersion: () => '0.0.0-test' },
   dialog: {},
   shell: {},
@@ -32,7 +40,7 @@ mock.module('electron', () => ({
     on: (channel: string, fn: (...args: unknown[]) => unknown) => handlers.set(channel, fn),
   },
 }))
-mock.module('./terminal/pty.js', () => ({
+vi.mock('./terminal/pty.js', () => ({
   TerminalManager: class {
     create() {}
     write() {}
@@ -41,7 +49,7 @@ mock.module('./terminal/pty.js', () => ({
     disposeAll() {}
   },
 }))
-mock.module('./self-mod/overlay-client.js', () => ({
+vi.mock('./self-mod/overlay-client.js', () => ({
   createOverlayClient: () => ({
     pin: async (path: string) => void log.push(`overlay.pin:${path}`),
     apply: async (paths: string[]) => void log.push(`overlay.apply:${paths.join(',')}`),
@@ -50,8 +58,6 @@ mock.module('./self-mod/overlay-client.js', () => ({
     turnEnd: async () => void log.push('overlay.turnEnd'),
   }),
 }))
-
-const handlers = new Map<string, (...args: unknown[]) => unknown>()
 
 const { registerIpc, HEARTH_CHANNELS } = await import('./ipc.js')
 type Services = Parameters<typeof registerIpc>[0]

@@ -2,7 +2,7 @@
 // extracted TurnCoordinator directly — no Electron, no module mocks, pure
 // injected dependencies. ipc.turn-lifecycle.test.ts keeps pinning the same
 // invariants end-to-end through the registered IPC handler.
-import { test, expect, describe, beforeEach } from 'bun:test'
+import { test, expect, describe, beforeEach } from 'vitest'
 import { TurnCoordinator, type TurnCoordinatorDeps } from './turn-coordinator.js'
 import { RunTracker } from './self-mod/run-tracker.js'
 import { HEARTH_CHANNELS } from '../shared/channels.js'

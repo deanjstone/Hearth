@@ -1,4 +1,4 @@
-import { test, expect, describe } from 'bun:test'
+import { test, expect, describe } from 'vitest'
 import { buildChildEnv, shouldScrubInheritedKeys, INHERITED_CREDENTIAL_VARS } from './child-env.js'
 
 describe('buildChildEnv', () => {
