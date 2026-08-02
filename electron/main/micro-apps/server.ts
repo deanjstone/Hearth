@@ -50,25 +50,25 @@ function viteBin(dir: string): string {
   return join(dir, 'node_modules', '.bin', 'vite')
 }
 
-// Install the micro-app's deps with bun. Resolves on a clean exit, rejects with
+// Install the micro-app's deps with pnpm. Resolves on a clean exit, rejects with
 // a clear message otherwise.
 //
 // `--ignore-scripts` is a hard security boundary: a micro-app's package.json is
 // agent-authored and therefore untrusted, and lifecycle scripts (postinstall et
 // al.) run in the MAIN process with full Node privileges. Disabling them stops an
 // install-time RCE in both dev and packaged builds (the packaged model still runs
-// bun install at runtime). Vite + React need no install scripts to function.
+// pnpm install at runtime). Vite + React need no install scripts to function.
 export function installDeps(dir: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    const child = spawn('bun', ['install', '--ignore-scripts'], { cwd: dir, stdio: ['ignore', 'pipe', 'pipe'] })
+    const child = spawn('pnpm', ['install', '--ignore-scripts'], { cwd: dir, stdio: ['ignore', 'pipe', 'pipe'] })
     let stderr = ''
     child.stderr?.on('data', (buf: Buffer) => {
       stderr += buf.toString()
     })
-    child.on('error', (err) => reject(new Error(`bun install failed to spawn in ${dir}: ${err.message}`)))
+    child.on('error', (err) => reject(new Error(`pnpm install failed to spawn in ${dir}: ${err.message}`)))
     child.on('exit', (code) => {
       if (code === 0) resolve()
-      else reject(new Error(`bun install failed in ${dir} (exit ${code})${stderr ? `: ${stderr.trim()}` : ''}`))
+      else reject(new Error(`pnpm install failed in ${dir} (exit ${code})${stderr ? `: ${stderr.trim()}` : ''}`))
     })
   })
 }
