@@ -96,6 +96,9 @@ importers:
       '@electron/rebuild':
         specifier: ^4.0.4
         version: 4.2.0
+      '@eslint/js':
+        specifier: ^9.39.5
+        version: 9.39.5
       '@tanstack/react-router':
         specifier: ^1.168.0
         version: 1.170.18(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
