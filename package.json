@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "packageManager": "pnpm@11.10.0",
   "type": "module",
-  "description": "A self-evolving macOS desktop client for coding agents (Claude Code, Codex) over ACP.",
+  "description": "A self-evolving Linux desktop client for coding agents (Claude Code, Codex) over ACP.",
   "author": "Jordan Stella <jordanjstella@gmail.com>",
   "main": "out/main/index.js",
   "scripts": {

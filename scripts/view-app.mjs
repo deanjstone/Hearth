@@ -8,7 +8,7 @@
 //   node scripts/view-app.mjs /history out.png -> ...and write to out.png
 //
 // A leading-slash first arg is treated as a route to navigate to; otherwise it's
-// the output path. Then open/read the PNG. Requires Hearth running (`bun dev`).
+// the output path. Then open/read the PNG. Requires Hearth running (`pnpm run dev`).
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { resolve, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -18,7 +18,7 @@ const urlFile = join(repoRoot, '.hearth', 'bridge-url')
 const tokenFile = join(repoRoot, '.hearth', 'bridge-token')
 
 if (!existsSync(urlFile)) {
-  console.error('Hearth does not appear to be running (no .hearth/bridge-url). Start it with `bun dev`.')
+  console.error('Hearth does not appear to be running (no .hearth/bridge-url). Start it with `pnpm run dev`.')
   process.exit(1)
 }
 

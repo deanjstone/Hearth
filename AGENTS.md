@@ -63,7 +63,7 @@ is independently undoable; overlapping work merges into one commit.
 
 ## Validation
 
-After editing renderer or main-process code, run `bun run typecheck`. Restart-tier
+After editing renderer or main-process code, run `pnpm run typecheck`. Restart-tier
 edits (`electron/**`, configs) are typechecked automatically before the app restarts;
 a failure is surfaced rather than bricking the app.
 

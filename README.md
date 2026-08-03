@@ -1,6 +1,6 @@
 # Hearth
 
-Hearth is a macOS desktop client for coding agents (Claude Code or Codex) that can
+Hearth is a Linux (WSL2) desktop client for coding agents (Claude Code or Codex) that can
 edit its own running interface. The renderer is served by a live Vite dev server,
 so when the agent edits Hearth's own source the change hot-reloads into the window
 with no restart, and every edit is a git commit you can revert. The agent can also
@@ -11,7 +11,7 @@ agent edits the app's own source, the sidebar reshapes in front of you, and the
 change shows up in the Changes view with one-click undo.
 
 ![Version](https://img.shields.io/badge/version-0.1.0-FF6B35?style=flat-square)
-![Platform](https://img.shields.io/badge/macOS-Apple%20Silicon-111111?style=flat-square&logo=apple&logoColor=white)
+![Platform](https://img.shields.io/badge/Linux-WSL2-111111?style=flat-square&logo=linux&logoColor=white)
 [![License](https://img.shields.io/badge/license-Apache%202.0-3178C6?style=flat-square)](LICENSE)
 
 <p align="center">
@@ -21,9 +21,10 @@ change shows up in the Changes view with one-click undo.
 
 ## Status
 
-Personal project, v0.1.0. macOS on Apple Silicon (M1 or later) only. Roughly 23k
-lines with 475 passing tests. It works and it is tested, but it is not a
-product and comes with no support. Use it at your own risk.
+Personal project, v0.1.0. Linux (WSL2) dev mode only: run from source, there is
+no packaged build for this platform. Roughly 23k lines with 475 passing tests. It
+works and it is tested, but it is not a product and comes with no support. Use it
+at your own risk.
 
 You bring your own agent. Hearth drives the Claude Code or Codex you already
 authenticated with `claude login` / `codex login` (or your own API key) over the
@@ -31,39 +32,31 @@ open [Agent Client Protocol](https://agentclientprotocol.com). It never stores,
 brokers, or sees your credentials, and it hosts nothing: files and conversations
 stay on your machine.
 
-## Install
-
-### [Download for macOS (Apple Silicon)](https://github.com/skeletor-js/Hearth/releases/latest)
-
-Open the `.dmg`, drag Hearth to Applications, and launch it. The current build is
-signed but not yet notarized, so Gatekeeper will warn on first launch: right-click
-the app and choose Open. A notarized build is coming; building from source (below)
-avoids the warning entirely. Either way you need a locally-authenticated Claude
-Code or Codex before it will do anything useful.
-
 ## Build from source
 
-Requires [Bun](https://bun.sh) and a locally-authenticated agent.
+There is no packaged build for Linux; this is a dev-mode-only port. You need
+Node 22, [pnpm](https://pnpm.io) (version pinned in `package.json`'s
+`packageManager` field), `build-essential` and `python3` (for the `node-pty`
+native rebuild), and a locally-authenticated agent.
 
 ```bash
-bun install
-bun run routes:gen              # generate the TanStack route tree (needed before typecheck from a fresh clone)
-bun run dev                     # opens the app with live HMR (Claude backend)
+pnpm install
+pnpm run routes:gen             # generate the TanStack route tree (needed before typecheck from a fresh clone)
+pnpm run dev                    # opens the app with live HMR (Claude backend)
 ```
 
 Same app on the Codex backend:
 
 ```bash
-HEARTH_AGENT=codex bun run dev
+HEARTH_AGENT=codex pnpm run dev
 ```
 
-Checks and a packaged build:
+Checks:
 
 ```bash
-bun test                        # ACP translation, git, self-mod, scope guard, boot watchdog, classifier
-bun run typecheck
-bun run lint
-bun run dist                    # signed macOS build (set APPLE_* env vars to also notarize)
+pnpm run test                   # ACP translation, git, self-mod, scope guard, boot watchdog, classifier
+pnpm run typecheck
+pnpm run lint
 ```
 
 Useful flags for UI work: `HEARTH_FAKE_AGENT=1` runs a scripted agent with no

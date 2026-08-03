@@ -60,7 +60,6 @@ export function createMainWindow(target: RendererTarget): BrowserWindow {
     height: 800,
     minWidth: 720,
     minHeight: 480,
-    titleBarStyle: 'hiddenInset', // macOS: traffic lights over our own chrome
     backgroundColor: '#0b0b0e',
     show: false,
     webPreferences: WEB_PREFERENCES,
