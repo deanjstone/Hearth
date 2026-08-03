@@ -28,3 +28,7 @@ micro-apps/*/dist/
 # local agent config
 .claude/settings.local.json
 .claude/.supermemory-claude/
+
+# Rust build output for the Tauri/WebKitGTK HMR spike (docs/decisions/rust-tauri-feasibility.md)
+spike/*/target/
+spike/*/node_modules/

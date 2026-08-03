@@ -1,0 +1,32 @@
+[
+  {
+    "name": "websocket / initial marker report reaches server",
+    "pass": true,
+    "detail": "moduleValue=1"
+  },
+  {
+    "name": "pin suppresses the live update (marker still reports old value)",
+    "pass": true,
+    "detail": "expected 1, got 1"
+  },
+  {
+    "name": "apply produces the new value via targeted HMR swap",
+    "pass": true,
+    "detail": "moduleValue=2"
+  },
+  {
+    "name": "apply does not trigger a full page reload",
+    "pass": true,
+    "detail": "rootMountCount before=1 after=1"
+  },
+  {
+    "name": "full-reload during an active turn is suppressed",
+    "pass": true,
+    "detail": "rootMountCount before=1 after=1"
+  },
+  {
+    "name": "full-reload after turn-end is not suppressed (suppression is turn-scoped)",
+    "pass": true,
+    "detail": "rootMountCount now=2"
+  }
+]
