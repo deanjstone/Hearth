@@ -1,0 +1,14 @@
+[package]
+name = "csp-proxy"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "csp-proxy"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+hyper = { version = "1", features = ["full"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+http-body-util = "0.1"

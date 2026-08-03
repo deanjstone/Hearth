@@ -27,6 +27,54 @@ expected to be absent) and `snapshot-offscreen.png` into
 `spike/tauri-hidden-capture/`, and prints a `SCENARIO_RESULT[...]` line per
 scenario to stdout.
 
+## Spike: does a Rust reverse proxy in front of Vite inject CSP headers and pass through the HMR WebSocket upgrade?
+
+See [wayfinder ticket #22](https://github.com/deanjstone/Hearth/issues/22)
+and #20's locked CSP design this prototypes. Verdict: **yes to both.**
+(a) On every normal HTTP response the proxy strips any upstream
+`Content-Security-Policy` header and stamps its own fixed value —
+confirmed via `curl` header comparison against the same request made
+directly to Vite, plus a body-diff proving the swap doesn't corrupt
+content. (b) Vite's HMR client targets wherever the page's own script was
+loaded from (no `hmr.clientPort`/`hmr.host` override in
+`vite.config.spike.ts`), so routing the page through the proxy makes the
+HMR WebSocket transit the proxy too — confirmed by editing the marker
+module and watching the new value land in the marker log over the same
+already-spliced connection, corroborated by Vite's own `hmr update` log
+line and the proxy's `SPLICE_START`/`SPLICE_END` evidence (no
+`SPLICE_ERROR` during actual use — the one seen in testing came from
+force-killing the app afterward, not from proxy misbehavior).
+
+Reproduce:
+
+```sh
+# 1. Standalone Vite server (repo root, port 5183) — same one the HMR spike uses
+pnpm exec vite --config spike/vite.config.spike.ts
+
+# 2. The proxy (port 5199, forwards to 5183)
+(cd spike/tauri-csp-proxy/proxy && cargo run)
+
+# 3. The Tauri test app — same Linux/WebKitGTK prerequisites as the HMR spike.
+#    Its tauri.conf.json points devUrl/windows[0].url at the proxy
+#    (http://localhost:5199/spike/tauri-csp-proxy/proxy-check.html), not at
+#    Vite directly, so this is the only route the window has to the dev server.
+(cd spike/tauri-csp-proxy/tauri-app/src-tauri && cargo run)
+
+# 4. Verify (a): compare headers between direct-to-Vite and through-the-proxy
+curl -sD - -o /dev/null http://localhost:5183/spike/tauri-csp-proxy/proxy-check.html
+curl -sD - -o /dev/null http://localhost:5199/spike/tauri-csp-proxy/proxy-check.html
+
+# 5. Verify (b): with the app running, edit src/spike-csp-proxy-marker.ts's
+#    MARKER_VALUE, save, then check the marker log through the proxy:
+curl -s http://localhost:5199/__spike/marker
+```
+
+Layout: `proxy/` is the Rust reverse proxy (hyper 1.x, one upstream, no TLS,
+no pooling — the smallest thing that answers the question). `tauri-app/` is
+a near-verbatim copy of `tauri-hmr-check/` pointed at the proxy instead of
+Vite. `proxy-check.html` is a dedicated static entry page (not the real
+Hearth app) that loads `src/spike-csp-proxy-marker.ts`.
+
 ## Layout
 
 - `tauri-hmr-check/` — minimal Tauri v2 shell. No IPC layer, no ACP, no

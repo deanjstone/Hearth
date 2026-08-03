@@ -1,0 +1,26 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "tauri-csp-proxy-check",
+  "version": "0.1.0",
+  "identifier": "ai.hearth.spike.cspproxycheck",
+  "build": {
+    "devUrl": "http://localhost:5199/spike/tauri-csp-proxy/proxy-check.html"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "tauri-csp-proxy-check",
+        "width": 800,
+        "height": 600,
+        "url": "http://localhost:5199/spike/tauri-csp-proxy/proxy-check.html"
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": false
+  }
+}
