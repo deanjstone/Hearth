@@ -119,30 +119,25 @@ a{color:inherit;text-decoration:none;cursor:default}
 .app{
   display:flex;
   gap:9px;
-  /* Top padding reserves a safe strip for the macOS traffic lights so they never
-     overlap the rail/brand. Sides/bottom stay tight. */
+  /* Top padding reserves a strip for the panel-toggle buttons above the cards.
+     Sides/bottom stay tight. */
   padding:var(--titlebar-h) 9px 9px;
   height:100vh;width:100vw;overflow:hidden;
   background:var(--bg-window);
   position:relative;
 }
 
-/* Draggable title-bar strip across the top safe area (where the traffic lights
-   live). Drag to move the window; double-click to zoom (fill) / restore. It sits
-   in the top padding above the cards, so it never covers interactive content. */
+/* Toolbar strip across the top safe area, hosting the panel-toggle buttons.
+   Double-click to zoom (fill) / restore the window. It sits in the top padding
+   above the cards, so it never covers interactive content. */
 .titlebar{
   position:absolute; top:0; left:0; right:0; height:var(--titlebar-h);
-  -webkit-app-region: drag; z-index:120;
+  z-index:120;
   display:flex; align-items:center; justify-content:space-between;
-  /* Left padding clears the macOS traffic lights; the left toggle sits just
-     to their right. */
-  padding:0 8px 0 78px;
+  padding:0 8px;
 }
-/* The toggle groups opt out of the drag region so they stay clickable. */
-.tb-left,.tb-right{ display:inline-flex; align-items:center; gap:2px; -webkit-app-region:no-drag; }
-/* Nudge the toggles down so their icon centers line up with the macOS traffic
-   lights (which sit a touch lower than the title-bar's geometric center). */
-.titlebar .pbtn{ width:24px; height:24px; -webkit-app-region:no-drag; position:relative; top:4px; }
+.tb-left,.tb-right{ display:inline-flex; align-items:center; gap:2px; }
+.titlebar .pbtn{ width:24px; height:24px; }
 
 /* ─────────────────────────  Left rail (card)  ───────────────────────── */
 .rail{ width:var(--rail-w);flex-shrink:0;position:relative;

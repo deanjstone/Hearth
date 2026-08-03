@@ -1,4 +1,4 @@
-import { test, expect, describe } from 'bun:test'
+import { test, expect, describe } from 'vitest'
 import { mapToolStatus, mapPermissionKind, translatePermission, translateUpdate, normalizeModels, normalizeModes, normalizeConfigOptions } from './acp-translate.js'
 
 describe('normalizeModels', () => {

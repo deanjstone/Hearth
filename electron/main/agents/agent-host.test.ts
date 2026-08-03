@@ -1,4 +1,4 @@
-import { test, expect, describe } from 'bun:test'
+import { test, expect, describe } from 'vitest'
 import { AgentHost, AgentDiedError } from './agent-host.js'
 import type { Agent, AgentExitInfo, AgentKind, AgentSession, PermissionRequest, SessionUpdate } from './agent.js'
 

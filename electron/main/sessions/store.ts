@@ -7,7 +7,8 @@
 // restoring a session at full fidelity. This module is storage only — no agent,
 // no Electron — so it unit-tests against a temp dir.
 
-import { mkdir, readFile, writeFile, appendFile, readdir, rm } from 'node:fs/promises'
+import { mkdir, readFile, writeFile, appendFile, readdir, rm, rename } from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import type { SessionUpdate, WorkspaceKind } from '../../shared/protocol.js'
 
@@ -105,7 +106,12 @@ export class SessionStore {
 
   private async writeIndex(index: SessionMeta[]): Promise<void> {
     await mkdir(this.baseDir, { recursive: true })
-    await writeFile(this.indexPath(), JSON.stringify(index, null, 2))
+    // Write to a temp file and rename over the target: a concurrent readIndex()
+    // (e.g. a debounced bump racing a fresh read) always sees either the old or
+    // the new file whole, never a partial write from an in-progress writeFile.
+    const tmp = join(this.baseDir, `index.json.${randomUUID()}.tmp`)
+    await writeFile(tmp, JSON.stringify(index, null, 2))
+    await rename(tmp, this.indexPath())
   }
 
   private async patch(id: string, fn: (m: SessionMeta) => SessionMeta): Promise<SessionMeta | null> {

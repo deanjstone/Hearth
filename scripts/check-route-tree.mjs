@@ -3,7 +3,7 @@
 // longer exists — the app then breaks at runtime with no failing gate. This
 // check fails when any `./routes/*` import in the tree has no backing file.
 //
-// It runs as the first half of `bun run typecheck`, which is also what the
+// It runs as the first half of `pnpm run typecheck`, which is also what the
 // self-mod post-edit validation gate (electron/main/self-mod/validate.ts)
 // executes — so agent edits that delete a route without regenerating the
 // tree are caught by the same gate, without touching the protected island.
@@ -29,7 +29,7 @@ function main() {
   const srcDir = resolve(process.cwd(), 'src')
   const treePath = join(srcDir, 'routeTree.gen.ts')
   if (!existsSync(treePath)) {
-    console.error('route-tree check: src/routeTree.gen.ts missing — run `bun run routes:gen`')
+    console.error('route-tree check: src/routeTree.gen.ts missing — run `pnpm run routes:gen`')
     process.exit(1)
   }
   const missing = missingRouteImports(readFileSync(treePath, 'utf8'), srcDir)
@@ -37,7 +37,7 @@ function main() {
     console.error(
       `route-tree check: routeTree.gen.ts imports ${missing.length} route file(s) that do not exist:\n` +
         missing.map((s) => `  src/${s}.tsx`).join('\n') +
-        '\nRegenerate the tree (`bun run routes:gen`) or restore the route file.',
+        '\nRegenerate the tree (`pnpm run routes:gen`) or restore the route file.',
     )
     process.exit(1)
   }

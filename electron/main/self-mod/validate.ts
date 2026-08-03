@@ -15,11 +15,11 @@ export interface TypecheckResult {
   output: string
 }
 
-/** Run `bun run typecheck` in the repo. Resolves with ok=false on type errors. */
+/** Run `pnpm run typecheck` in the repo. Resolves with ok=false on type errors. */
 export function runTypecheck(repoRoot: string, timeoutMs = 120_000): Promise<TypecheckResult> {
   return new Promise((resolve) => {
     execFile(
-      'bun',
+      'pnpm',
       ['run', 'typecheck'],
       { cwd: repoRoot, timeout: timeoutMs, maxBuffer: 16 * 1024 * 1024 },
       (err, stdout, stderr) => {

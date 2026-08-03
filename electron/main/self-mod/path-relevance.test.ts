@@ -1,4 +1,4 @@
-import { test, expect, describe } from 'bun:test'
+import { test, expect, describe } from 'vitest'
 import { classifyPath, classifyBatch, isViteTrackablePath, type ReloadKind } from './path-relevance'
 
 describe('classifyPath', () => {

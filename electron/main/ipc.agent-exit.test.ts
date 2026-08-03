@@ -2,16 +2,25 @@
 // agent-side promise completes) and broadcast agent:error ATTRIBUTED to the
 // dying turn's session — not whatever session is foreground.
 //
-// `electron` / node-pty / the overlay client are mock.module'd as in
-// ipc.turn-lifecycle.test.ts; ipc.js is imported with a ?u5 query so this file
-// gets its own module instance bound to THIS file's mocks even when another
-// test file already evaluated ipc.js against its own electron mock.
-import { test, expect, describe, beforeEach, mock } from 'bun:test'
+// `electron` / node-pty / the overlay client are vi.mock'd as in
+// ipc.turn-lifecycle.test.ts. Bun's mock.module needed a `?u5` cache-busting
+// query on the ipc.js import so this file got its own module instance
+// bound to THIS file's mocks, even when another test file already evaluated
+// ipc.js against its own electron mock; vitest isolates each test file's
+// module registry by default, so that trick is no longer needed here.
+//
+// vi.mock factories are hoisted above this file's top-level code, so
+// anything they close over (handlers/sent) must come from vi.hoisted()
+// rather than a plain top-level const — otherwise vitest throws on the
+// out-of-scope reference.
+import { test, expect, describe, beforeEach, vi } from 'vitest'
 
-const handlers = new Map<string, (...args: unknown[]) => unknown>()
-const sent: Array<{ channel: string; payload: unknown }> = []
+const { handlers, sent } = vi.hoisted(() => ({
+  handlers: new Map<string, (...args: unknown[]) => unknown>(),
+  sent: [] as Array<{ channel: string; payload: unknown }>,
+}))
 
-mock.module('electron', () => ({
+vi.mock('electron', () => ({
   app: { on: () => {}, getPath: () => '/tmp', getVersion: () => '0.0.0-test' },
   dialog: {},
   shell: {},
@@ -20,12 +29,12 @@ mock.module('electron', () => ({
     on: (channel: string, fn: (...args: unknown[]) => unknown) => handlers.set(channel, fn),
   },
 }))
-mock.module('./terminal/pty.js', () => ({
+vi.mock('./terminal/pty.js', () => ({
   TerminalManager: class {
     disposeAll() {}
   },
 }))
-mock.module('./self-mod/overlay-client.js', () => ({
+vi.mock('./self-mod/overlay-client.js', () => ({
   createOverlayClient: () => ({
     pin: async () => {},
     apply: async () => {},
@@ -35,7 +44,7 @@ mock.module('./self-mod/overlay-client.js', () => ({
   }),
 }))
 
-const { registerIpc, HEARTH_CHANNELS } = await import('./ipc.js?u5')
+const { registerIpc, HEARTH_CHANNELS } = await import('./ipc.js')
 type Services = Parameters<typeof registerIpc>[0]
 
 function makeServices() {

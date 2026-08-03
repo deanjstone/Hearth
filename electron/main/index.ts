@@ -324,5 +324,5 @@ app.on('activate', () => {
 
 app.on('window-all-closed', () => {
   stopAllMicroApps()
-  if (process.platform !== 'darwin') app.quit()
+  app.quit()
 })

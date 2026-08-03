@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test'
+import { expect, test } from 'vitest'
 import { toToolSlug } from './SaveAsTool'
 
 const NAME_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/

@@ -1,4 +1,4 @@
-import { test, expect, describe } from 'bun:test'
+import { test, expect, describe } from 'vitest'
 import { existsSync } from 'node:fs'
 import { resolveAdapterBin } from './acp-agent.js'
 

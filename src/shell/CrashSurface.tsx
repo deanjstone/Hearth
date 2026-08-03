@@ -21,7 +21,7 @@ const repairPrompt = (message: string, file: string | null): string =>
   `Error: ${message}\n` +
   (file ? `Likely file: ${file}\n` : '') +
   `\nPlease repair it now: find and fix the root cause in the code, keep the change ` +
-  `minimal, run \`bun run typecheck\`, and commit. Return a short summary of what you changed.`
+  `minimal, run \`pnpm run typecheck\`, and commit. Return a short summary of what you changed.`
 
 export function CrashSurface({ message, file }: { message: string; file: string | null }) {
   const [status, setStatus] = useState<'idle' | 'repairing' | 'reverting'>('idle')

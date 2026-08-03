@@ -113,11 +113,9 @@ function RootLayout() {
   )
 }
 
-// The macOS title-bar safe strip: reserves room for the traffic lights, lets the
-// user drag the window, zooms (fill ⟷ restore) on double-click, and hosts the
-// panel-toggle buttons. The left toggle (right of the traffic lights) fully
-// shows/hides the sidebar; the right-aligned pair toggle the bottom + right panels
-// (session only). Buttons opt out of the drag region so they stay clickable.
+// The app's top toolbar strip: zooms (fill ⟷ restore) the window on double-click,
+// and hosts the panel-toggle buttons. The left toggle fully shows/hides the
+// sidebar; the right-aligned pair toggle the bottom + right panels (session only).
 function Titlebar() {
   const s = useShell()
   return (

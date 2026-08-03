@@ -1,4 +1,4 @@
-import { test, expect, describe } from 'bun:test'
+import { test, expect, describe } from 'vitest'
 import { applyUpdate, EMPTY_TRANSCRIPT, type TranscriptState } from './transcript-reducer'
 import type { PlanEntry, SessionUpdate } from '../../../electron/shared/protocol'
 

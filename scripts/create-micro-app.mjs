@@ -35,4 +35,4 @@ for (const file of ['package.json', 'index.html', 'src/App.tsx']) {
 }
 
 console.log(`Created micro-app: micro-apps/${name}`)
-console.log(`Next: cd micro-apps/${name} && bun install && bun dev`)
+console.log(`Next: cd micro-apps/${name} && pnpm install && pnpm dev`)

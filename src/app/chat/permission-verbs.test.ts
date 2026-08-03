@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test'
+import { expect, test } from 'vitest'
 import { humanizePermission } from './permission-verbs'
 import type { PermissionRequest } from '../../../electron/shared/protocol'
 

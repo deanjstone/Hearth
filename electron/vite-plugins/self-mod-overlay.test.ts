@@ -1,4 +1,4 @@
-import { test, expect, describe } from 'bun:test'
+import { test, expect, describe } from 'vitest'
 import path from 'node:path'
 import { OverlayState } from './self-mod-overlay'
 

@@ -1,4 +1,4 @@
-import { test, expect, describe } from 'bun:test'
+import { test, expect, describe } from 'vitest'
 import { computeNextRun, dueRoutines, validateSchedule } from './schedule'
 import type { Routine } from '../../shared/protocol'
 
