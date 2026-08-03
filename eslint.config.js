@@ -8,7 +8,7 @@ import reactHooks from 'eslint-plugin-react-hooks'
 // would make agent edits slow to validate. `bun run typecheck` covers types.
 export default tseslint.config(
   {
-    ignores: ['out/**', 'dist/**', 'release/**', '.hearth/**', 'node_modules/**', 'src/routeTree.gen.ts', 'micro-apps/**', 'templates/**'],
+    ignores: ['out/**', 'dist/**', 'release/**', '.hearth/**', 'node_modules/**', 'src/routeTree.gen.ts', 'micro-apps/**', 'templates/**', 'spike/**/target/**', 'spike/**/node_modules/**'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -38,7 +38,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['electron/**/*.{ts,mjs}', 'scripts/**/*.mjs', '*.config.{ts,js}'],
+    files: ['electron/**/*.{ts,mjs}', 'scripts/**/*.mjs', 'spike/**/*.mjs', '*.config.{ts,js}'],
     languageOptions: { globals: { ...globals.node } },
   },
   {
