@@ -1,0 +1,20 @@
+[package]
+name = "tauri-hidden-capture"
+version = "0.1.0"
+description = "Spike: does webkit_web_view_get_snapshot() capture real pixels from a hidden/off-screen WebviewWindow?"
+authors = ["you"]
+edition = "2021"
+
+[lib]
+name = "tauri_hidden_capture_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+webkit2gtk = "2.0.2"
+cairo-rs = { version = "0.18", features = ["png"] }

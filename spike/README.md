@@ -4,6 +4,29 @@ See `docs/decisions/rust-tauri-feasibility.md` §10.1 (question) and §12
 (results). Verdict: **confirmed viable** — 6/6 criteria passed identically
 against both an Electron control and a Tauri/WebKitGTK test run.
 
+## Spike: does `webkit_web_view_get_snapshot()` capture a hidden/off-screen window?
+
+See [wayfinder ticket #17](https://github.com/deanjstone/Hearth/issues/17)
+and `docs/decisions/rust-tauri-feasibility.md` §10.3. Verdict: **`visible(false)`
+does not work** — WebKitGTK never realizes/maps the widget, so the snapshot
+call reliably fails with a generic glib error. **A visible-but-off-screen
+window does work** — `.visible(true)` with `.position(-32000.0, -32000.0)`,
+`.decorations(false)`, `.skip_taskbar(true)`, `.focused(false)` produces a
+correct, real-pixel PNG every time, confirmed by visual inspection of the
+output. This is the workaround Hearth's own hidden-capture path (`view_app`)
+needs to use in the Rust port, not the naive `visible(false)` approach.
+
+Reproduce (same WebKitGTK/Linux prerequisites as the HMR spike below):
+
+```sh
+(cd spike/tauri-hidden-capture/src-tauri && cargo run)
+```
+
+Writes `snapshot-hidden-false.png` (only if that scenario somehow succeeds —
+expected to be absent) and `snapshot-offscreen.png` into
+`spike/tauri-hidden-capture/`, and prints a `SCENARIO_RESULT[...]` line per
+scenario to stdout.
+
 ## Layout
 
 - `tauri-hmr-check/` — minimal Tauri v2 shell. No IPC layer, no ACP, no
