@@ -1,0 +1,26 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "tauri-hmr-check",
+  "version": "0.1.0",
+  "identifier": "ai.hearth.spike.hmrcheck",
+  "build": {
+    "devUrl": "http://localhost:5183"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "tauri-hmr-check",
+        "width": 800,
+        "height": 600,
+        "url": "http://localhost:5183"
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": false
+  }
+}
