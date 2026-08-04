@@ -16,10 +16,15 @@
 // /__hearth/self-mod endpoint, and asserts the live DOM reflects the new
 // value via the stable data-testid below — kept separate from any real UI
 // selector so unrelated UI changes can't break this test.
-
-export const PROBE_VALUE = 'probe-v1'
+//
+// Deliberately a single component export, nothing else — React Fast
+// Refresh falls back to a full page reload (not a targeted swap) for a
+// module that mixes a component export with a plain value export, which
+// would defeat the "apply doesn't trigger a full reload" assertion this
+// probe exists for. PROBE_VALUE stays a local const, not a separate export.
 
 export function SelfModProbe() {
+  const PROBE_VALUE = 'probe-v1'
   return (
     <div
       data-testid="self-mod-probe"
