@@ -1,5 +1,6 @@
 packages:
   - .
+  - e2e-tests
 
 allowBuilds:
   dugite: true
@@ -11,3 +12,11 @@ allowBuilds:
   # postinstall is a no-op verification step on linux-x64, confirmed working
   # (`esbuild --version`) without running it.
   esbuild: false
+  # Transitive deps of @wdio/tauri-service's browser-driver-manager tooling, for
+  # testing Edge/Firefox — Hearth only ever drives WebKitGTK via tauri-driver, so
+  # these postinstall binary downloads are unused.
+  edgedriver: false
+  geckodriver: false
+
+minimumReleaseAgeExclude:
+  - '@wdio/tauri-service@1.3.0'

@@ -11,6 +11,7 @@
     "dev": "electron-vite dev --watch",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
+    "dev:tauri-frontend": "vite --config vite.config.tauri.ts",
     "typecheck": "node scripts/check-route-tree.mjs && tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
     "lint": "eslint .",
     "test": "vitest run",
