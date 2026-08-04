@@ -6,4 +6,5 @@ pub mod path_relevance;
 pub mod reload_driver;
 pub mod run_tracker;
 pub mod scope_guard;
+pub mod service;
 pub mod validate;
