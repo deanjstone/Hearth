@@ -32,3 +32,7 @@ micro-apps/*/dist/
 # Rust build output for the Tauri/WebKitGTK HMR spike (docs/decisions/rust-tauri-feasibility.md)
 spike/*/target/
 spike/*/node_modules/
+
+# Rust/Tauri port (deanjstone/Hearth#26, #27)
+src-tauri/target/
+src-tauri/gen/
