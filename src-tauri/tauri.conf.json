@@ -1,0 +1,13 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Hearth",
+  "version": "0.1.0",
+  "identifier": "ai.hearth.dev",
+  "build": { "devUrl": "http://localhost:5173" },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [{ "title": "Hearth", "width": 1280, "height": 800, "url": "http://localhost:5173" }],
+    "security": { "csp": null }
+  },
+  "bundle": { "active": false }
+}
