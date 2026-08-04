@@ -16,7 +16,10 @@ const APPLICATION = resolve(import.meta.dirname, '../src-tauri/target/debug/hear
 
 export const config = {
   runner: 'local',
-  specs: ['./specs/**/*.spec.js'],
+  // boot-watchdog.spec.js runs only via its own wdio.boot-watchdog.conf.js —
+  // it needs a bricking marker armed in onPrepare before its session's app
+  // process ever launches, which a shared session pool here can't do per-file.
+  specs: ['./specs/**/*.spec.js', '!./specs/boot-watchdog.spec.js'],
   maxInstances: 1,
   capabilities: [
     {
