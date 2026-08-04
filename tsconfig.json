@@ -14,6 +14,6 @@
     "baseUrl": ".",
     "paths": { "@/*": ["src/*"] }
   },
-  "include": ["src", "electron/preload", "electron/shared"],
+  "include": ["src", "electron/preload", "electron/preload-tauri", "electron/shared"],
   "exclude": ["**/*.test.ts", "**/*.test.tsx"]
 }
