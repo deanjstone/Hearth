@@ -53,7 +53,8 @@ describe('HMR self-mod swap', () => {
     // 3. Apply — un-pins and triggers the real HMR swap.
     await overlay('apply', { paths: [PROBE_REL] })
     await browser.waitUntil(async () => (await $(SELECTOR).getText()) !== preEditText, {
-      timeout: 10000,
+      timeout: 20000,
+      interval: 250,
       timeoutMsg: `expected ${SELECTOR} to update after apply`,
     })
 

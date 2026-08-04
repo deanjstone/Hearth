@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-self-mod-redo"
+description = "Enables the self_mod_redo command without any pre-configured scope."
+commands.allow = ["self_mod_redo"]
+
+[[permission]]
+identifier = "deny-self-mod-redo"
+description = "Denies the self_mod_redo command without any pre-configured scope."
+commands.deny = ["self_mod_redo"]

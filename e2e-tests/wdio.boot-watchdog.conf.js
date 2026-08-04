@@ -49,7 +49,9 @@ export const config = {
       'tauri:options': { application: APPLICATION },
     },
   ],
-  services: [['@wdio/tauri-service', {}]],
+  // See wdio.conf.js's comment — 'external' uses the classic tauri-driver
+  // binary rather than requiring an embedded Rust plugin Hearth doesn't have.
+  services: [['@wdio/tauri-service', { driverProvider: 'external' }]],
   logLevel: 'info',
   framework: 'mocha',
   reporters: ['spec'],

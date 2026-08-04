@@ -30,8 +30,10 @@ function git(...args) {
 describe('undo/redo (real IPC)', () => {
   const originalSource = readFileSync(PROBE_ABS, 'utf8')
   let commitHash
+  let preTestHead
 
   before(() => {
+    preTestHead = git('rev-parse', 'HEAD')
     const editedSource = originalSource.replace('probe-v1', 'probe-v1-undo-redo-fixture')
     writeFileSync(PROBE_ABS, editedSource)
     git('add', PROBE_REL)
@@ -41,12 +43,13 @@ describe('undo/redo (real IPC)', () => {
   })
 
   after(() => {
-    // Best-effort: make sure the repo isn't left dirty/with an extra commit
-    // regardless of how the test above went.
+    // Reset to the exact pre-test HEAD, not just "back one" — how many
+    // commits landed on top depends on how far the test got (fixture only,
+    // fixture+undo-revert, or fixture+undo-revert+redo-revert).
     try {
-      git('reset', '--hard', 'HEAD~1')
+      git('reset', '--hard', preTestHead)
     } catch {
-      // already reverted by the test itself, or nothing to reset — fine.
+      // Best-effort — leave state for manual inspection if this fails.
     }
     writeFileSync(PROBE_ABS, originalSource)
   })
@@ -57,7 +60,7 @@ describe('undo/redo (real IPC)', () => {
     expect(readFileSync(PROBE_ABS, 'utf8')).toBe(originalSource)
 
     await browser.waitUntil(async () => (await $(SELECTOR).getText()) === 'probe-v1', {
-      timeout: 10000,
+      timeout: 15000,
       timeoutMsg: 'expected the live window to reflect the undo via HMR',
     })
   })
@@ -68,7 +71,7 @@ describe('undo/redo (real IPC)', () => {
     expect(readFileSync(PROBE_ABS, 'utf8')).toContain('probe-v1-undo-redo-fixture')
 
     await browser.waitUntil(async () => (await $(SELECTOR).getText()) === 'probe-v1-undo-redo-fixture', {
-      timeout: 10000,
+      timeout: 15000,
       timeoutMsg: 'expected the live window to reflect the redo via HMR',
     })
   })

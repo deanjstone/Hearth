@@ -25,7 +25,12 @@ export const config = {
       'tauri:options': { application: APPLICATION },
     },
   ],
-  services: [['@wdio/tauri-service', {}]],
+  // 'external' = the classic tauri-driver binary (cargo install tauri-driver),
+  // which is what #36's research validated end-to-end. The package's default
+  // ('embedded') instead expects a tauri-plugin-wdio-webdriver Rust plugin
+  // compiled into the app, which Hearth doesn't have — that's a heavier,
+  // out-of-scope change for a Phase 1 CI job.
+  services: [['@wdio/tauri-service', { driverProvider: 'external' }]],
   logLevel: 'info',
   framework: 'mocha',
   reporters: ['spec'],
