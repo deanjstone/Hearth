@@ -26,6 +26,21 @@ ureq = { version = "2", default-features = false, features = ["json"] }
 # in this dev environment (reports success, never signals the group); calling
 # the syscall directly is both more robust and avoids spawning an extra process.
 libc = "0.2"
+# Loopback bridge server (bridge.rs) for the agent's view_app/read_ui/click/fill/
+# eval_js tools — a tiny synchronous HTTP server, no async runtime needed (the
+# app doesn't otherwise pull in tokio), matching the minimal-dependency approach
+# already used for the overlay client (ureq) and process-group kill (libc). The
+# per-boot bearer token is read straight from /dev/urandom (see bridge.rs) rather
+# than pulling in the `rand` crate for 32 bytes.
+tiny_http = "0.12"
+
+# This port targets WSL2/Linux only (per spec #26's scope decision), so the
+# WebKitGTK-specific snapshot primitive (bridge.rs's snapshot_window) is
+# gated to this target — same split spike/tauri-hidden-capture/ used to prove
+# it out.
+[target.'cfg(target_os = "linux")'.dependencies]
+webkit2gtk = "2.0.2"
+cairo-rs = { version = "0.18", features = ["png"] }
 
 [dev-dependencies]
 tempfile = "3"
