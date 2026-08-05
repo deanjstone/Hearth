@@ -10,6 +10,7 @@
 // `#[allow(dead_code)]` until that lands.
 #[allow(dead_code)]
 mod agents;
+mod bridge;
 mod ready;
 mod reload_driver_tauri;
 #[allow(dead_code)]
@@ -78,12 +79,21 @@ pub fn run() {
             // skipped (nothing built one for Tauri yet) in favor of a plain
             // window reload.
             let hmr = HmrController::new(driver, true);
+            let bridge_repo_root = repo_root.clone();
             let self_mod = SelfModService::new(repo_root, hmr);
 
             app.manage(AppState {
                 self_mod,
                 boot_watchdog,
             });
+
+            // The agent's view_app/read_ui/click/fill/eval_js bridge
+            // (Hearth#27 Phase 2) — a loopback HTTP server, same shape as
+            // electron/main/agent-bridge.ts. Needs the "main" window to
+            // already exist (it's used for both the default snapshot target
+            // and eval_js), so this runs after the window above is created.
+            bridge::start(app.handle().clone(), bridge_repo_root);
+
             Ok(())
         })
         .run(tauri::generate_context!())
