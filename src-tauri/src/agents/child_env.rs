@@ -105,7 +105,7 @@ mod tests {
             },
         );
         for k in INHERITED_CREDENTIAL_VARS {
-            assert!(env.get(*k).is_none(), "{k} should have been scrubbed");
+            assert!(!env.contains_key(*k), "{k} should have been scrubbed");
         }
         assert_eq!(env.get("PATH").unwrap(), "/usr/bin"); // unrelated vars untouched
     }
@@ -134,7 +134,7 @@ mod tests {
                 scrub_inherited_keys: true,
             },
         );
-        assert!(env.get("ANTHROPIC_API_KEY").is_none());
+        assert!(!env.contains_key("ANTHROPIC_API_KEY"));
     }
 
     #[test]

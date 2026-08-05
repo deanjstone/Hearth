@@ -9,11 +9,19 @@
 // protected-island types — they carry serde derives directly rather than routing
 // through a separate DTO layer at the Tauri-command boundary.
 //
-// The `Agent`/`AgentSession` async traits (the live-connection surface) land in a
-// later chunk alongside `AgentHost`'s growth and the `tokio` dependency they need;
-// this file is deliberately async-free so it has no new dependencies.
+// The `Agent`/`AgentSession` async traits below are the live-connection surface —
+// the Rust analog of `agent.ts`'s interfaces. TS registers `onUpdate`/`onPermission`/
+// `onExit` callbacks on the connection; Rust reshapes that as a single `AgentEvent`
+// channel handed to `connect()`, since a live event stream is the more idiomatic
+// Rust equivalent of callback registration, and it composes cleanly with
+// `tokio::select!` on the consuming side (`AgentHost`, next chunk). A permission
+// ask is a request-response, not fire-and-forget, so its event variant carries a
+// `oneshot::Sender` the asker awaits directly — the same shape the map's permission
+// round-trip standing decision already uses for the outward (Rust → renderer) leg.
 
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use tokio::sync::{mpsc, oneshot};
 
 /// Which ACP backend. Mirrors `shared/protocol.ts`'s `AgentKind`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -298,6 +306,102 @@ pub enum SessionUpdate {
         #[serde(rename = "stopReason")]
         stop_reason: String,
     },
+}
+
+/// How the adapter subprocess died (mirrors `child_process`'s `'exit'` event).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AgentExitInfo {
+    pub code: Option<i32>,
+    pub signal: Option<String>,
+}
+
+/// Per-session options. `cwd` is the task working directory (the workspace).
+#[derive(Debug, Clone, Default)]
+pub struct NewSessionOptions {
+    pub cwd: Option<String>,
+}
+
+/// A generic config option's new value — mirrors TS's `string | boolean` union.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ConfigValue {
+    Str(String),
+    Bool(bool),
+}
+
+/// Pushed from a live `Agent` connection to whatever's driving it (`AgentHost`,
+/// next chunk) for the lifetime of the connection.
+pub enum AgentEvent {
+    Update {
+        session_id: String,
+        update: SessionUpdate,
+    },
+    /// A mid-turn permission ask. The asker blocks on `respond` resolving.
+    Permission {
+        session_id: String,
+        request: PermissionRequest,
+        respond: oneshot::Sender<String>,
+    },
+    /// Fired only on an UNEXPECTED adapter death — never for a deliberate dispose.
+    Exit(AgentExitInfo),
+}
+
+/// One live ACP session. Mirrors `agent.ts`'s `AgentSession` interface.
+/// `models`/`modes`/`config_options` are snapshots captured at session creation —
+/// they don't change out from under a live session; `AgentHost` maintains its own
+/// live cache from streamed `SessionUpdate`s (see `acp_translate.rs`, next chunk).
+#[async_trait]
+pub trait AgentSession: Send + Sync {
+    fn id(&self) -> &str;
+    fn models(&self) -> ModelState;
+    fn modes(&self) -> ModeState;
+    fn config_options(&self) -> Vec<ConfigOption>;
+    /// Send a turn. `images` are attached as ACP image blocks when the backend
+    /// advertises the capability (ignored otherwise).
+    async fn prompt(&self, text: &str, images: &[PromptImage]) -> Result<(), String>;
+    /// Switch the model for this session (no-op if the backend exposes none).
+    async fn set_model(&self, model_id: &str) -> Result<(), String>;
+    /// Switch the permission mode (no-op if the backend exposes none).
+    async fn set_mode(&self, mode_id: &str) -> Result<(), String>;
+    async fn set_config_option(&self, config_id: &str, value: ConfigValue) -> Result<(), String>;
+    async fn cancel(&self) -> Result<(), String>;
+    async fn dispose(&self) -> Result<(), String>;
+}
+
+/// A live ACP backend connection. Mirrors `agent.ts`'s `Agent` interface.
+#[async_trait]
+pub trait Agent: Send + Sync {
+    fn kind(&self) -> AgentKind;
+    /// Spawn the ACP adapter subprocess and complete the ACP handshake. `events`
+    /// carries every update/permission-ask/exit for the connection's lifetime.
+    async fn connect(&self, events: mpsc::UnboundedSender<AgentEvent>) -> Result<(), String>;
+    async fn new_session(&self, opts: NewSessionOptions) -> Result<Box<dyn AgentSession>, String>;
+    /// Resume a prior conversation by its ACP session id. Rejects if the backend
+    /// can't load it (the caller falls back to a fresh session). Default: no
+    /// backends implementing this trait support resume unless they override it.
+    async fn resume_session(
+        &self,
+        acp_session_id: &str,
+        opts: NewSessionOptions,
+    ) -> Result<Box<dyn AgentSession>, String> {
+        let _ = (acp_session_id, opts);
+        Err("resume not supported".to_string())
+    }
+    /// Prompt capabilities the adapter advertised at initialize.
+    fn prompt_capabilities(&self) -> PromptCapabilities {
+        PromptCapabilities {
+            image: false,
+            embedded_context: false,
+        }
+    }
+    /// Auth methods the adapter advertised at initialize (empty until connected).
+    fn auth_methods(&self) -> Vec<AuthMethodInfo> {
+        Vec::new()
+    }
+    /// Slash commands / skills the agent has advertised this connection.
+    fn advertised_commands(&self) -> Vec<AvailableCommand> {
+        Vec::new()
+    }
+    async fn dispose(&self) -> Result<(), String>;
 }
 
 #[cfg(test)]
