@@ -53,6 +53,11 @@ tokio = { version = "1", features = ["sync", "process", "time", "macros"] }
 # yet, and hand-rolling Pin<Box<dyn Future>> everywhere is worse than one small,
 # well-established dependency for exactly this.
 async-trait = "0.1"
+# Zed's published ACP wire-schema crate (Chunk 3a, spec #48) — `acp_translate.rs`
+# maps its typed request/notification structs into Hearth's own shapes. Default
+# features only: per the crate-shape research (Hearth#44), none of Hearth's
+# current ACP usage needs any of the crate's six `unstable_*` Cargo features.
+agent-client-protocol = "2.0.0"
 
 # This port targets WSL2/Linux only (per spec #26's scope decision), so the
 # WebKitGTK-specific snapshot primitive (bridge.rs's snapshot_window) is
