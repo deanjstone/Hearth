@@ -60,6 +60,14 @@ use tokio::task::JoinHandle;
 // This trait is that same narrow slice. `AgentHostBridge` (bottom of this
 // file) is the concrete type implementing it, wrapping the full
 // `AgentHostEngine`.
+// This trait, `PromptOptions`, and `AgentHostBridge` (bottom of this file)
+// exist for `turn_coordinator.rs`'s self-mod-wrapped turn lifecycle, which
+// Chunk 5 (spec #48) deliberately did NOT wire into real Tauri commands yet —
+// `agent_commands.rs`'s `agent_prompt` calls `AgentHostEngine` directly
+// instead, since full self-mod-turn integration needs a real session store
+// that isn't ported to Tauri at all yet. Left unused-but-ready for whichever
+// future chunk also ports session storage.
+#[allow(dead_code)]
 pub struct PromptOptions {
     /// Renderer session key — one ACP session per key.
     pub key: String,
@@ -70,6 +78,7 @@ pub struct PromptOptions {
     // turn coordinator's self-mod turns are text-only.
 }
 
+#[allow(dead_code)]
 pub trait AgentHost: Send + Sync {
     /// Run one turn against the current backend; returns the ACP session id
     /// it ran under (for resume on a later turn).
@@ -727,6 +736,10 @@ impl AgentHostEngine {
         Ok(())
     }
 
+    /// Called from `lib.rs`'s `RunEvent::ExitRequested` handler (Chunk 5) —
+    /// settles any outstanding permission asks/in-flight turns with a clean
+    /// error before the process exits, alongside `teardown()`'s other two
+    /// callers (`switch_to`/`reconnect`).
     pub async fn dispose(self: &Arc<Self>) {
         self.teardown().await;
     }
@@ -855,10 +868,14 @@ impl AgentHostEngine {
 /// Wraps a live `AgentHostEngine` behind the narrow sync `AgentHost` trait,
 /// blocking the calling (Tauri command) thread for one turn's duration. See
 /// the module doc for why this exists and why `block_on` is safe here.
+/// Unused until `turn_coordinator.rs` is wired into real commands — see the
+/// `#[allow(dead_code)]` above `PromptOptions`.
+#[allow(dead_code)]
 pub struct AgentHostBridge {
     engine: Arc<AgentHostEngine>,
 }
 
+#[allow(dead_code)]
 impl AgentHostBridge {
     pub fn new(engine: Arc<AgentHostEngine>) -> Self {
         Self { engine }

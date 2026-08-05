@@ -7,4 +7,5 @@ pub mod reload_driver;
 pub mod run_tracker;
 pub mod scope_guard;
 pub mod service;
+pub mod shell_guard;
 pub mod validate;

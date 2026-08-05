@@ -229,6 +229,9 @@ struct ConnectionHandle {
 /// the only real difference between them is which adapter `resolve_spec`
 /// resolves and which env/quirks it applies (`claude.rs` / `codex.rs`).
 pub struct AcpClient {
+    /// Read by the `Agent::kind()` impl below — currently unread from a live
+    /// call site (see that trait method's own `#[allow(dead_code)]`).
+    #[allow(dead_code)]
     kind: AgentKind,
     resolve_spec: Box<dyn Fn() -> Result<AdapterSpec, String> + Send + Sync>,
     connection: StdMutex<Option<ConnectionHandle>>,

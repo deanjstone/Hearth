@@ -58,6 +58,14 @@ async-trait = "0.1"
 # features only: per the crate-shape research (Hearth#44), none of Hearth's
 # current ACP usage needs any of the crate's six `unstable_*` Cargo features.
 agent-client-protocol = "2.0.0"
+# Source-write enforcement (Chunk 5, spec #48, user story 21) — selfmod/shell_guard.rs
+# is a direct port of shell-guard.ts's regexes, including a negative lookahead
+# (excluding fd-duplication/process-substitution from the redirect check) the
+# standard `regex` crate deliberately doesn't support (it guarantees linear-time
+# matching by excluding backtracking features). `fancy-regex` supports the same
+# backtracking regex features JS's native RegExp does, keeping this a faithful
+# port instead of a hand-rewritten reimplementation of the pattern's semantics.
+fancy-regex = "0.13"
 
 # This port targets WSL2/Linux only (per spec #26's scope decision), so the
 # WebKitGTK-specific snapshot primitive (bridge.rs's snapshot_window) is

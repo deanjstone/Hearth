@@ -40,7 +40,13 @@ pub enum AgentAuth {
     Subscription,
 }
 
-/// Per-backend spawn config. Mirrors `agent.ts`'s `AgentConfig`.
+/// Per-backend spawn config. Mirrors `agent.ts`'s `AgentConfig`. `kind`/`auth`
+/// are set at construction (lib.rs's factory closure) but not read back off
+/// this struct anywhere yet — each backend's `AcpClient` gets its `kind`
+/// directly (not via this config), and subscription auth needs no further
+/// branching. Kept on the struct for wire/API parity with `agent.ts` and for
+/// whichever later phase adds a real api-key path.
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct AgentConfig {
     pub kind: AgentKind,
@@ -200,6 +206,68 @@ pub struct AuthMethodInfo {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+}
+
+/// Current-backend status (main → renderer on the backend-changed event).
+/// Mirrors `shared/protocol.ts`'s `BackendStatus`.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BackendStatus {
+    pub kind: AgentKind,
+    /// Present if the backend failed to connect after a switch.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+/// What the renderer needs to show truthful per-backend auth state. Mirrors
+/// `shared/protocol.ts`'s `AuthState`. Phase 3 is subscription-only (see
+/// `AgentAuth`), so `mode` is always `"subscription"` and `key_source` is
+/// always `None` here — both fields still exist on the wire so a later
+/// phase's api-key path doesn't need to reshape this struct.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthState {
+    pub kind: AgentKind,
+    pub mode: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub key_source: Option<String>,
+    /// The ACP handshake completed (the adapter spawned + initialized). Only
+    /// the active backend has a live adapter to report this.
+    pub connected: bool,
+    /// Connect error, when the adapter failed to come up.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    /// For the INACTIVE backend: whether the CLI's own stored login is
+    /// present (presence-only — never the token value).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub login_present: Option<bool>,
+    pub methods: Vec<AuthMethodInfo>,
+}
+
+/// Payload shape for the `agent:update` event (Rust → renderer).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentUpdatePayload {
+    pub session_id: String,
+    pub update: SessionUpdate,
+}
+
+/// Payload shape for the `permission:request` event (Rust → renderer).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PermissionRequestPayload {
+    pub session_id: String,
+    pub req: PermissionRequest,
+}
+
+/// Payload shape for the `agent:error` event (Rust → renderer). `session_key`
+/// attributes the failure to the renderer session whose turn was in flight
+/// when the adapter died; `None` means a global failure.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentErrorPayload {
+    pub session_key: Option<String>,
+    pub message: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -364,12 +432,19 @@ pub trait AgentSession: Send + Sync {
     async fn set_mode(&self, mode_id: &str) -> Result<(), String>;
     async fn set_config_option(&self, config_id: &str, value: ConfigValue) -> Result<(), String>;
     async fn cancel(&self) -> Result<(), String>;
+    /// No caller yet — `AgentHostEngine` disposes at the `Agent` (connection)
+    /// level, not per-session; a future per-session teardown path (e.g. the
+    /// renderer explicitly closing one conversation) is the natural caller.
+    #[allow(dead_code)]
     async fn dispose(&self) -> Result<(), String>;
 }
 
 /// A live ACP backend connection. Mirrors `agent.ts`'s `Agent` interface.
 #[async_trait]
 pub trait Agent: Send + Sync {
+    /// No caller yet — `AgentHostEngine` tracks the current kind itself
+    /// rather than reading it back off a live connection.
+    #[allow(dead_code)]
     fn kind(&self) -> AgentKind;
     /// Spawn the ACP adapter subprocess and complete the ACP handshake. `events`
     /// carries every update/permission-ask/exit for the connection's lifetime.

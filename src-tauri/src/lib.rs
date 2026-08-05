@@ -8,7 +8,7 @@
 // all wait on `turn_coordinator`/`agents` being wired through IPC, which
 // needs a real `AgentHost` (Phase 3, ACP agent runtime). Both modules keep
 // `#[allow(dead_code)]` until that lands.
-#[allow(dead_code)]
+mod agent_commands;
 mod agents;
 mod agents_commands;
 mod bridge;
@@ -20,6 +20,9 @@ mod selfmod_commands;
 #[allow(dead_code)]
 mod turn_coordinator;
 
+use agent_commands::AgentState;
+use agents::agent::{Agent, AgentAuth, AgentConfig, AgentKind};
+use agents::agent_host::{AgentFactory, AgentHostEngine};
 use agents::startup_check;
 use reload_driver_tauri::TauriReloadDriver;
 use selfmod::boot_watchdog::{BootDecision, BootWatchdog};
@@ -27,7 +30,7 @@ use selfmod::git;
 use selfmod::hmr::HmrController;
 use selfmod::service::SelfModService;
 use selfmod_commands::AppState;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex, OnceLock};
 use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -40,6 +43,23 @@ pub fn run() {
             ready::frontend_ready,
             agents_commands::agent_runtime_status,
             agents_commands::agent_runtime_recheck,
+            agent_commands::agent_prompt,
+            agent_commands::agent_cancel,
+            agent_commands::agent_backend_get,
+            agent_commands::agent_backend_set,
+            agent_commands::agent_models_get,
+            agent_commands::agent_model_set,
+            agent_commands::agent_modes_get,
+            agent_commands::agent_mode_set,
+            agent_commands::agent_config_get,
+            agent_commands::agent_config_set,
+            agent_commands::agent_usage_get,
+            agent_commands::agent_prompt_caps_get,
+            agent_commands::agent_commands_get,
+            agent_commands::permission_respond,
+            agent_commands::auth_status,
+            agent_commands::auth_login,
+            agent_commands::auth_logout,
         ])
         .setup(|app| {
             // Not yet packaged (bundle.active is false in tauri.conf.json) — dev
@@ -97,6 +117,36 @@ pub fn run() {
                 eprintln!("[hearth] agent runtime unavailable at startup: {agent_runtime_status:?}");
             }
 
+            // --- Agent chat (Chunk 5, spec #48): construct the real
+            // AgentHostEngine, wiring HostEvent -> Tauri events via
+            // agent_commands::emit_host_event. The OnceLock breaks the
+            // construction cycle (emit_host_event needs the engine handle
+            // itself, for permission auto-reject, but the closure is built
+            // before AgentHostEngine::new returns it) — see
+            // emit_host_event's doc comment. Claude is the initial backend,
+            // matching Electron's own default.
+            let agent_repo_root = repo_root.clone();
+            let engine_cell: Arc<OnceLock<Arc<AgentHostEngine>>> = Arc::new(OnceLock::new());
+            let emit_cell = engine_cell.clone();
+            let emit_handle = app.handle().clone();
+            let factory: AgentFactory = Box::new(move |kind| {
+                let cwd = agent_repo_root.to_string_lossy().into_owned();
+                let config = AgentConfig { kind, cwd, auth: AgentAuth::Subscription };
+                match kind {
+                    AgentKind::Claude => {
+                        Arc::new(agents::claude::new_agent(config, agent_repo_root.clone())) as Arc<dyn Agent>
+                    }
+                    AgentKind::Codex => {
+                        Arc::new(agents::codex::new_agent(config, agent_repo_root.clone())) as Arc<dyn Agent>
+                    }
+                }
+            });
+            let agent_host = AgentHostEngine::new(factory, AgentKind::Claude, move |event| {
+                agent_commands::emit_host_event(&emit_handle, &emit_cell, event);
+            });
+            engine_cell.set(agent_host.clone()).ok();
+            app.manage(AgentState { host: agent_host });
+
             app.manage(AppState {
                 self_mod,
                 boot_watchdog,
@@ -113,6 +163,20 @@ pub fn run() {
 
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app_handle, event| {
+            // Clean shutdown teardown (spec #48's Permission round-trip
+            // decision: "AgentHost::teardown() called by backend switch,
+            // reconnect, and shutdown") — settles any outstanding permission
+            // asks/in-flight turns with a clean error instead of leaving them
+            // hanging, and aborts the event-drain task before the process
+            // exits.
+            if let tauri::RunEvent::ExitRequested { .. } = event {
+                if let Some(state) = app_handle.try_state::<AgentState>() {
+                    let host = state.host.clone();
+                    tauri::async_runtime::block_on(host.dispose());
+                }
+            }
+        });
 }

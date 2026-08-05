@@ -2,9 +2,15 @@
 // model. Ported from electron/main/agents/fake.ts — plays a realistic self-edit
 // turn: assistant message, plan, thought, a tool call that produces a diff, a
 // mid-turn permission ask, then a closing message and end. Exercises every
-// SessionUpdate variant and the permission round-trip, and is the seam
-// AgentHost's orchestration logic is tested against (next chunk) — no real
-// subprocess, no Tauri harness, no live ACP wire traffic.
+// SessionUpdate variant and the permission round-trip.
+//
+// Not currently constructed anywhere: Chunk 2b's AgentHost orchestration
+// tests ended up using a separate, narrower `StubAgent` double (ported from
+// agent-host.test.ts's own fixture) instead of this one. Kept — a scripted,
+// full-surface fake agent is still useful for exercising the renderer's UI
+// against every SessionUpdate variant without a live model, once something
+// wires it up (e.g. a dev-only backend kind) — but nothing does yet.
+#![allow(dead_code)]
 
 use super::agent::{
     Agent, AgentEvent, AgentExitInfo, AgentKind, AgentSession, ConfigOption, ConfigValue,
