@@ -69,8 +69,23 @@ describe('view_app/eval_js bridge', () => {
   let base
   let token
 
-  before(() => {
+  before(async () => {
     ;({ base, token } = readBridge())
+
+    // This spec runs first in the shared spec order and hits a freshly
+    // booted app (hmr-self-mod.spec.js / undo-redo.spec.js implicitly get a
+    // warm-up via their own $(selector) polling before asserting anything).
+    // window.hearth is set by a synchronous side-effect import in
+    // main.tsx, before React even renders — but Vite's dev-mode module
+    // graph fetch can still take a beat on a cold session, so wait for it
+    // rather than assume it's already there the instant the bridge answers.
+    await browser.waitUntil(
+      async () => {
+        const result = await bridgeEval(base, token, '!!(window.hearth && window.hearth.selfMod && window.hearth.view)')
+        return result.ok && result.result === true
+      },
+      { timeout: 15000, interval: 250, timeoutMsg: 'window.hearth.{selfMod,view} never became available' },
+    )
   })
 
   it('rejects a request with the wrong bearer token', async () => {
@@ -110,14 +125,32 @@ describe('view_app/eval_js bridge', () => {
   })
 
   it('captures a route in an off-screen window without disturbing the main window', async () => {
-    const before = await bridgeSnapshot(base, token, undefined)
+    // Establish a *stable* baseline first: right after boot the main window
+    // can still be mid-paint (or mid-crash-recovery — see the file header's
+    // note on #41) between two captures a few hundred ms apart, which isn't
+    // what this test is about. Poll until two consecutive captures agree,
+    // then that's the baseline route-capture must not disturb.
+    let stableBaseline = null
+    await browser.waitUntil(
+      async () => {
+        const a = await bridgeSnapshot(base, token, undefined)
+        const b = await bridgeSnapshot(base, token, undefined)
+        if (a.equals(b)) {
+          stableBaseline = b
+          return true
+        }
+        return false
+      },
+      { timeout: 15000, interval: 300, timeoutMsg: 'the main window never settled into two consecutive identical captures' },
+    )
 
     const routePng = await bridgeSnapshot(base, token, '/history')
     expect(routePng.subarray(0, 8)).toEqual(PNG_MAGIC)
 
-    // The user's actual window must come back byte-identical — nothing about
-    // capturing a different route should have touched it.
+    // The user's actual window must come back byte-identical to the settled
+    // baseline — nothing about capturing a different route should have
+    // touched it.
     const after = await bridgeSnapshot(base, token, undefined)
-    expect(after.equals(before)).toBe(true)
+    expect(after.equals(stableBaseline)).toBe(true)
   })
 })
