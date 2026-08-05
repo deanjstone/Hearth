@@ -42,6 +42,18 @@ export interface CreateRoutineInput {
   cwd: string
 }
 
+/**
+ * Whether agent chat can run at all — the Tauri build's startup Node/adapter
+ * check (Chunk 4, spec #48). Electron has no failure mode here (it spawns
+ * adapters via `ELECTRON_RUN_AS_NODE`, using its own binary as the Node
+ * interpreter), so `window.hearth.agentRuntime` always resolves `ok` there;
+ * only the Tauri build's shim can report the other two.
+ */
+export type AgentRuntimeStatus =
+  | { status: 'ok' }
+  | { status: 'node-missing' }
+  | { status: 'adapter-missing'; package: string }
+
 /** Current-backend status (main → renderer on the backend-changed channel). */
 export interface BackendStatus {
   kind: AgentKind

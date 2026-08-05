@@ -14,19 +14,29 @@
 // `git.ts`'s `SelfModLogEntry` and `self-mod-service.ts`'s `StepResult`
 // produce, so `electron/preload-tauri/self-mod.ts`'s TS types apply unchanged.
 
+use crate::agents::startup_check::AgentRuntimeStatus;
 use crate::reload_driver_tauri::TauriReloadDriver;
 use crate::selfmod::boot_watchdog::BootWatchdog;
 use crate::selfmod::git::{SelfModKind, SelfModLogEntry};
 use crate::selfmod::path_relevance::ReloadKind;
 use crate::selfmod::service::{SelfModService, StepResult};
 use serde::Serialize;
+use std::path::PathBuf;
+use std::sync::Mutex;
 
-/// Owns the long-lived self-mod collaborators for the app's lifetime.
-/// Registered via `app.manage(...)` in `lib.rs`'s `setup` hook, once the
-/// main window (and so the real `ReloadDriver`) exists.
+/// Owns the long-lived self-mod + agent-runtime collaborators for the app's
+/// lifetime. Registered via `app.manage(...)` in `lib.rs`'s `setup` hook,
+/// once the main window (and so the real `ReloadDriver`) exists.
 pub struct AppState {
     pub self_mod: SelfModService<TauriReloadDriver>,
     pub boot_watchdog: BootWatchdog,
+    /// Resolves the vendored adapter packages for `agent_runtime_recheck`
+    /// (agents_commands.rs) — the same repo root `self_mod`/`bridge::start`
+    /// already resolve in `lib.rs`'s `setup()`.
+    pub repo_root: PathBuf,
+    /// Cached result of the eager Node/adapter startup check (Chunk 4, spec
+    /// #48). `Mutex`-guarded since "Check again" mutates it in place.
+    pub agent_runtime_status: Mutex<AgentRuntimeStatus>,
 }
 
 fn kind_str(kind: SelfModKind) -> &'static str {
@@ -37,7 +47,10 @@ fn kind_str(kind: SelfModKind) -> &'static str {
     }
 }
 
-fn reload_str(kind: ReloadKind) -> &'static str {
+/// `pub(crate)` so `agent_commands.rs`'s `SelfModResultDto` (the result of a
+/// self-mod-wrapped agent turn) can reuse this instead of duplicating the
+/// `ReloadKind` -> wire-string mapping.
+pub(crate) fn reload_str(kind: ReloadKind) -> &'static str {
     match kind {
         ReloadKind::Hmr => "hmr",
         ReloadKind::FullReload => "full-reload",

@@ -6,18 +6,33 @@
 //
 // Deliberately partial: Phase 1 (Hearth#27) ported `selfMod` + `frontendReady`;
 // Phase 2 adds `view.onNavigate` (the agent's route-capture bridge — see
-// src-tauri/src/bridge.rs). Not the full ~90-method/20-namespace `HearthApi`
-// surface (see spec #26's "IPC surface" decision — ported per in-scope
-// subsystem as it lands, not upfront). The cast below is intentionally
-// unsound today and will narrow to a real subset type, or fill in for real,
-// as later phases wire their own namespaces through IPC.
+// src-tauri/src/bridge.rs); Phase 3 Chunk 4 adds `agentRuntime` (the startup
+// Node/adapter check — see src-tauri/src/agents_commands.rs); Phase 3 Chunk 5
+// adds `agent`/`permission`/`auth` (the full agent-chat surface — see
+// src-tauri/src/agent_commands.rs); closing Phase 3's exit-criterion gap adds
+// `sessions` (src-tauri/src/sessions_commands.rs) and a deliberately minimal
+// `workspaces` (src-tauri/src/workspaces_commands.rs — see its own header
+// comment for why it's not a full registry port) — together these are what
+// `ChatView.tsx`'s `ensureActiveSession()` needs, so "chat with Claude/Codex
+// works through the Tauri build" (spec #48's Phase 3 exit criterion) is now
+// actually reachable end-to-end. Not the full ~90-method/20-namespace
+// `HearthApi` surface (see spec #26's "IPC surface" decision — ported per
+// in-scope subsystem as it lands, not upfront). The cast below is
+// intentionally unsound today and will narrow to a real subset type, or fill
+// in for real, as later phases wire their own namespaces through IPC.
 //
 // No-ops entirely under Electron (`window.__TAURI__` absent) so this import
 // is safe regardless of which shell the renderer is actually running under.
 
 import type { HearthApi } from '../../electron/preload/index.js'
+import { agent } from '../../electron/preload-tauri/agent.js'
+import { agentRuntime } from '../../electron/preload-tauri/agent-runtime.js'
+import { auth } from '../../electron/preload-tauri/auth.js'
+import { permission } from '../../electron/preload-tauri/permission.js'
 import { selfMod } from '../../electron/preload-tauri/self-mod.js'
+import { sessions } from '../../electron/preload-tauri/sessions.js'
 import { view } from '../../electron/preload-tauri/view.js'
+import { workspaces } from '../../electron/preload-tauri/workspaces.js'
 
 declare global {
   interface Window {
@@ -26,5 +41,5 @@ declare global {
 }
 
 if (typeof window !== 'undefined' && window.__TAURI__ && !window.hearth) {
-  window.hearth = { selfMod, view } as unknown as HearthApi
+  window.hearth = { selfMod, view, agentRuntime, agent, permission, auth, sessions, workspaces } as unknown as HearthApi
 }

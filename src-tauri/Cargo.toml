@@ -34,6 +34,39 @@ libc = "0.2"
 # than pulling in the `rand` crate for 32 bytes.
 tiny_http = "0.12"
 
+# ACP agent runtime (agents/**, Phase 3, spec #48) — the one subsystem that's
+# genuinely async: spawning adapter subprocesses, streaming session updates, and
+# blocking a turn on a permission answer without pinning an OS thread. Scoped to
+# agents/ per the spec's standing decision; the rest of src-tauri/ (self-mod,
+# bridge, git) stays sync as before. "sync" for Mutex/oneshot (the permission
+# round-trip channel), "process" for spawning the adapter subprocess without
+# blocking, "time" for FakeAgent's scripted-turn pacing (fake.rs), "macros" for
+# `tokio::select!` (agent_host.rs races a turn against adapter death). Tauri's
+# own command dispatch already runs on a tokio runtime (and pulls in "rt"/
+# "rt-multi-thread", unified across the build by Cargo), so code inside a
+# Tauri command can `.await` these without spawning one itself, and
+# `tauri::async_runtime::block_on` (agent_host.rs's sync bridge for
+# turn_coordinator.rs) works even outside one.
+tokio = { version = "1", features = ["sync", "process", "time", "macros"] }
+# Dyn-compatible async trait methods (Agent/AgentSession are used as trait
+# objects behind AgentHost) — Rust's native async-fn-in-traits isn't object-safe
+# yet, and hand-rolling Pin<Box<dyn Future>> everywhere is worse than one small,
+# well-established dependency for exactly this.
+async-trait = "0.1"
+# Zed's published ACP wire-schema crate (Chunk 3a, spec #48) — `acp_translate.rs`
+# maps its typed request/notification structs into Hearth's own shapes. Default
+# features only: per the crate-shape research (Hearth#44), none of Hearth's
+# current ACP usage needs any of the crate's six `unstable_*` Cargo features.
+agent-client-protocol = "2.0.0"
+# Source-write enforcement (Chunk 5, spec #48, user story 21) — selfmod/shell_guard.rs
+# is a direct port of shell-guard.ts's regexes, including a negative lookahead
+# (excluding fd-duplication/process-substitution from the redirect check) the
+# standard `regex` crate deliberately doesn't support (it guarantees linear-time
+# matching by excluding backtracking features). `fancy-regex` supports the same
+# backtracking regex features JS's native RegExp does, keeping this a faithful
+# port instead of a hand-rewritten reimplementation of the pattern's semantics.
+fancy-regex = "0.13"
+
 # This port targets WSL2/Linux only (per spec #26's scope decision), so the
 # WebKitGTK-specific snapshot primitive (bridge.rs's snapshot_window) is
 # gated to this target — same split spike/tauri-hidden-capture/ used to prove
@@ -44,3 +77,7 @@ cairo-rs = { version = "0.18", features = ["png"] }
 
 [dev-dependencies]
 tempfile = "3"
+# rt+macros: #[tokio::test] needs its own tiny runtime to drive async test fns
+# (a Tauri command's tests run outside Tauri's own runtime). Cargo unifies these
+# with the "sync"/"process" features above for test builds only.
+tokio = { version = "1", features = ["rt", "macros"] }
