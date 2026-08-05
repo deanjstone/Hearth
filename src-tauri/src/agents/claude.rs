@@ -12,6 +12,11 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+/// The vendored adapter package + bin name, shared with `startup_check.rs` so
+/// the eager availability check can't drift from what actually gets spawned.
+pub const PACKAGE: &str = "@zed-industries/claude-agent-acp";
+pub const BIN: &str = "claude-agent-acp";
+
 // Permission mode is driven at RUNTIME over ACP (`AgentSession::set_mode`,
 // applied per session by `AgentHostEngine` — both backends start at the
 // Default/prompt baseline). The static settings-file pin Hearth used to write
@@ -101,11 +106,7 @@ fn ensure_parseable_permission_mode(cwd: &Path, home: &Path) -> std::io::Result<
 
 fn resolve_adapter(config: &AgentConfig, repo_root: &Path) -> Result<AdapterSpec, String> {
     // Run the vendored claude-agent-acp bin, not whatever `claude` is on PATH.
-    let bin = resolve_adapter_bin(
-        repo_root,
-        "@zed-industries/claude-agent-acp",
-        "claude-agent-acp",
-    )?;
+    let bin = resolve_adapter_bin(repo_root, PACKAGE, BIN)?;
 
     // Mode is driven at runtime over ACP; this only shields the adapter from
     // an unparseable user defaultMode (no-op otherwise). Everything else

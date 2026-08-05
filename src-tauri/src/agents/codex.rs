@@ -12,10 +12,15 @@ use super::agent::{AgentConfig, AgentKind};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+/// The vendored adapter package + bin name, shared with `startup_check.rs` so
+/// the eager availability check can't drift from what actually gets spawned.
+pub const PACKAGE: &str = "@agentclientprotocol/codex-acp";
+pub const BIN: &str = "codex-acp";
+
 fn resolve_adapter(config: &AgentConfig, repo_root: &Path) -> Result<AdapterSpec, String> {
     // Run the vendored codex-acp bin (which drives the vendored @openai/codex),
     // not whatever `codex` is on PATH.
-    let bin = resolve_adapter_bin(repo_root, "@agentclientprotocol/codex-acp", "codex-acp")?;
+    let bin = resolve_adapter_bin(repo_root, PACKAGE, BIN)?;
     Ok(AdapterSpec {
         command: "node".to_string(),
         args: vec![bin.to_string_lossy().into_owned()],

@@ -7,3 +7,4 @@ pub mod claude;
 pub mod codex;
 pub mod fake;
 pub mod login_presence;
+pub mod startup_check;

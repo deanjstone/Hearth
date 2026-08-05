@@ -10,6 +10,7 @@
 // `#[allow(dead_code)]` until that lands.
 #[allow(dead_code)]
 mod agents;
+mod agents_commands;
 mod bridge;
 mod ready;
 mod reload_driver_tauri;
@@ -19,12 +20,14 @@ mod selfmod_commands;
 #[allow(dead_code)]
 mod turn_coordinator;
 
+use agents::startup_check;
 use reload_driver_tauri::TauriReloadDriver;
 use selfmod::boot_watchdog::{BootDecision, BootWatchdog};
 use selfmod::git;
 use selfmod::hmr::HmrController;
 use selfmod::service::SelfModService;
 use selfmod_commands::AppState;
+use std::sync::Mutex;
 use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -35,6 +38,8 @@ pub fn run() {
             selfmod_commands::self_mod_undo,
             selfmod_commands::self_mod_redo,
             ready::frontend_ready,
+            agents_commands::agent_runtime_status,
+            agents_commands::agent_runtime_recheck,
         ])
         .setup(|app| {
             // Not yet packaged (bundle.active is false in tauri.conf.json) — dev
@@ -80,11 +85,23 @@ pub fn run() {
             // window reload.
             let hmr = HmrController::new(driver, true);
             let bridge_repo_root = repo_root.clone();
-            let self_mod = SelfModService::new(repo_root, hmr);
+            let self_mod = SelfModService::new(repo_root.clone(), hmr);
+
+            // Startup Node/adapter check (Chunk 4, spec #48): eager, once,
+            // cached — see startup_check.rs's doc comment for why (agent-chat
+            // only, not a whole-app gate). PATH is read once here rather than
+            // inside `check()` itself so the pure function stays fixture-testable.
+            let path_var = std::env::var("PATH").unwrap_or_default();
+            let agent_runtime_status = startup_check::check(&repo_root, &path_var);
+            if agent_runtime_status != startup_check::AgentRuntimeStatus::Ok {
+                eprintln!("[hearth] agent runtime unavailable at startup: {agent_runtime_status:?}");
+            }
 
             app.manage(AppState {
                 self_mod,
                 boot_watchdog,
+                repo_root,
+                agent_runtime_status: Mutex::new(agent_runtime_status),
             });
 
             // The agent's view_app/read_ui/click/fill/eval_js bridge
