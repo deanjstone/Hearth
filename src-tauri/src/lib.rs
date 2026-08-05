@@ -1,13 +1,11 @@
 // Ported piece by piece across the Phase 1 PR sequence (deanjstone/Hearth#27).
-// This chunk wires the Phase 1 issue's "Minimal IPC" scope into real app
-// boot: `window.hearth.selfMod.{history,undo,redo}` + the frontend-ready
-// event + the boot watchdog's revert-on-bricked-boot check. That reaches a
-// meaningful slice of `selfmod` (see selfmod_commands.rs, ready.rs,
-// lib.rs::run) but not all of it — `capture_turn`'s commit path, the real
-// typecheck runner, RunTracker's live subagent attribution, and OverlayClient
-// all wait on `turn_coordinator`/`agents` being wired through IPC, which
-// needs a real `AgentHost` (Phase 3, ACP agent runtime). Both modules keep
-// `#[allow(dead_code)]` until that lands.
+// Closing Phase 3's exit-criterion gap (spec #48): `agent_prompt` now routes
+// through `TurnCoordinator` (self-mod's commit/typecheck wrapping) backed by
+// a real `SessionStore`, so `capture_turn`'s commit path, the real typecheck
+// runner, and `OverlayClient` are all live — `RunTracker`'s live subagent
+// attribution (self-mod:activity) is the one remaining TS behavior with no
+// Rust wiring yet (self_mod.ts's own onActivity/onValidation preload stubs
+// still no-op).
 mod agent_commands;
 mod agents;
 mod agents_commands;
@@ -17,21 +15,27 @@ mod reload_driver_tauri;
 #[allow(dead_code)]
 mod selfmod;
 mod selfmod_commands;
-#[allow(dead_code)]
+mod sessions;
+mod sessions_commands;
 mod turn_coordinator;
+mod workspaces_commands;
 
-use agent_commands::AgentState;
+use agent_commands::{AgentState, BoxedOverlayClient};
 use agents::agent::{Agent, AgentAuth, AgentConfig, AgentKind};
-use agents::agent_host::{AgentFactory, AgentHostEngine};
+use agents::agent_host::{AgentFactory, AgentHostBridge, AgentHostEngine};
 use agents::startup_check;
 use reload_driver_tauri::TauriReloadDriver;
 use selfmod::boot_watchdog::{BootDecision, BootWatchdog};
 use selfmod::git;
 use selfmod::hmr::HmrController;
+use selfmod::overlay_client::OverlayClient;
 use selfmod::service::SelfModService;
 use selfmod_commands::AppState;
+use sessions::store::SessionStore;
+use sessions_commands::SessionState;
 use std::sync::{Arc, Mutex, OnceLock};
 use tauri::Manager;
+use turn_coordinator::TurnCoordinator;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -60,6 +64,17 @@ pub fn run() {
             agent_commands::auth_status,
             agent_commands::auth_login,
             agent_commands::auth_logout,
+            sessions_commands::sessions_list,
+            sessions_commands::sessions_search,
+            sessions_commands::sessions_create,
+            sessions_commands::sessions_get,
+            sessions_commands::sessions_append,
+            sessions_commands::sessions_rename,
+            sessions_commands::sessions_set_kind,
+            sessions_commands::sessions_archive,
+            sessions_commands::sessions_delete,
+            sessions_commands::sessions_duplicate,
+            workspaces_commands::workspaces_list,
         ])
         .setup(|app| {
             // Not yet packaged (bundle.active is false in tauri.conf.json) — dev
@@ -145,7 +160,32 @@ pub fn run() {
                 agent_commands::emit_host_event(&emit_handle, &emit_cell, event);
             });
             engine_cell.set(agent_host.clone()).ok();
-            app.manage(AgentState { host: agent_host });
+
+            // --- Session persistence + self-mod-wrapped turns: closes
+            // Phase 3's exit-criterion gap (spec #48: "chat with Claude/Codex
+            // works through the Tauri build"). `SessionStore` lives in its
+            // own app-scoped data dir (Tauri's `app_data_dir`, like the boot
+            // watchdog marker above) — separate from Electron's `userData`
+            // sessions, since the two builds have different app identifiers;
+            // no session continuity between them is expected during
+            // development. `OverlayClient`'s dev URL is the same fixed
+            // `http://localhost:5173` `tauri.conf.json` already declares
+            // (HmrController's own `vite_served: true` above makes the same
+            // dev-only assumption).
+            let sessions_dir = app.path().app_data_dir()?.join("sessions");
+            let session_store = Arc::new(SessionStore::new(sessions_dir));
+            app.manage(SessionState { store: session_store });
+
+            let agent_bridge = Arc::new(AgentHostBridge::new(agent_host.clone()));
+            let overlay: Arc<BoxedOverlayClient> = Arc::new(OverlayClient::new(
+                Box::new(|| Some("http://localhost:5173".to_string())) as Box<dyn Fn() -> Option<String> + Send + Sync>,
+            ));
+            app.manage(AgentState {
+                host: agent_host,
+                bridge: agent_bridge,
+                turn_coordinator: Arc::new(TurnCoordinator::new()),
+                overlay,
+            });
 
             app.manage(AppState {
                 self_mod,

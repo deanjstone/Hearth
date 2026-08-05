@@ -47,7 +47,10 @@ fn kind_str(kind: SelfModKind) -> &'static str {
     }
 }
 
-fn reload_str(kind: ReloadKind) -> &'static str {
+/// `pub(crate)` so `agent_commands.rs`'s `SelfModResultDto` (the result of a
+/// self-mod-wrapped agent turn) can reuse this instead of duplicating the
+/// `ReloadKind` -> wire-string mapping.
+pub(crate) fn reload_str(kind: ReloadKind) -> &'static str {
     match kind {
         ReloadKind::Hmr => "hmr",
         ReloadKind::FullReload => "full-reload",

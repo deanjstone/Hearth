@@ -59,26 +59,18 @@ use tokio::task::JoinHandle;
 // `TurnCoordinatorDeps` only ever narrows it to `Pick<AgentHost, 'prompt'>`.
 // This trait is that same narrow slice. `AgentHostBridge` (bottom of this
 // file) is the concrete type implementing it, wrapping the full
-// `AgentHostEngine`.
-// This trait, `PromptOptions`, and `AgentHostBridge` (bottom of this file)
-// exist for `turn_coordinator.rs`'s self-mod-wrapped turn lifecycle, which
-// Chunk 5 (spec #48) deliberately did NOT wire into real Tauri commands yet —
-// `agent_commands.rs`'s `agent_prompt` calls `AgentHostEngine` directly
-// instead, since full self-mod-turn integration needs a real session store
-// that isn't ported to Tauri at all yet. Left unused-but-ready for whichever
-// future chunk also ports session storage.
-#[allow(dead_code)]
+// `AgentHostEngine`. Wired into a real Tauri command (`agent_commands.rs`'s
+// `agent_prompt`) once `sessions/store.rs` gave `TurnCoordinator` a real
+// `SessionMetaStore` to depend on — closing Phase 3's exit-criterion gap.
 pub struct PromptOptions {
     /// Renderer session key — one ACP session per key.
     pub key: String,
     pub cwd: Option<String>,
     /// A prior ACP session id to resume, if the backend supports it (W3).
     pub resume_id: Option<String>,
-    // Image attachments (TS's `PromptImage[]`) are out of scope here: the
-    // turn coordinator's self-mod turns are text-only.
+    pub images: Vec<PromptImage>,
 }
 
-#[allow(dead_code)]
 pub trait AgentHost: Send + Sync {
     /// Run one turn against the current backend; returns the ACP session id
     /// it ran under (for resume on a later turn).
@@ -868,14 +860,10 @@ impl AgentHostEngine {
 /// Wraps a live `AgentHostEngine` behind the narrow sync `AgentHost` trait,
 /// blocking the calling (Tauri command) thread for one turn's duration. See
 /// the module doc for why this exists and why `block_on` is safe here.
-/// Unused until `turn_coordinator.rs` is wired into real commands — see the
-/// `#[allow(dead_code)]` above `PromptOptions`.
-#[allow(dead_code)]
 pub struct AgentHostBridge {
     engine: Arc<AgentHostEngine>,
 }
 
-#[allow(dead_code)]
 impl AgentHostBridge {
     pub fn new(engine: Arc<AgentHostEngine>) -> Self {
         Self { engine }
@@ -888,7 +876,7 @@ impl AgentHost for AgentHostBridge {
         let host_opts = HostPromptOptions {
             key: Some(opts.key.clone()),
             cwd: opts.cwd.clone(),
-            images: Vec::new(),
+            images: opts.images.clone(),
             resume_id: opts.resume_id.clone(),
         };
         let text = text.to_string();
@@ -1637,6 +1625,7 @@ mod tests {
                     key: "s1".to_string(),
                     cwd: None,
                     resume_id: None,
+                    images: Vec::new(),
                 },
             )
             .unwrap();

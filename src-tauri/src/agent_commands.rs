@@ -1,6 +1,5 @@
 // The `window.hearth.agent`/`window.hearth.permission`/`window.hearth.auth`
-// Tauri surface (Chunk 5, spec deanjstone/Hearth#48) — the final piece of
-// Phase 3. Ported from the `agent*`/`permission*`/`auth*` handlers in
+// Tauri surface. Ported from the `agent*`/`permission*`/`auth*` handlers in
 // electron/main/ipc.ts, backed by the `AgentHostEngine` built in Chunk 2b and
 // the real ACP connection built in Chunk 3b.
 //
@@ -10,43 +9,100 @@
 // verbatim, since Tauri events are plain strings with no naming conflict to
 // resolve.
 //
-// **Scope decision**: `agent_prompt` calls `AgentHostEngine::prompt` directly
-// rather than routing through `TurnCoordinator` (which wraps every Electron
-// turn in self-mod's commit/typecheck machinery). Electron's `agent:prompt`
-// handler is literally `turns.runTurn(payload)` — full parity would need that
-// wrapping too — but `TurnCoordinator` needs a real `SessionMetaStore`
-// (session persistence), which isn't ported to Tauri at all yet (neither is
-// `window.hearth.sessions.*`, which the renderer needs regardless to load a
-// session before it can prompt). Wiring self-mod-turn integration is deferred
-// to whichever future chunk also ports session storage; this chunk is scoped
-// to the plain ACP chat surface spec #48 describes. `agent_prompt` therefore
-// returns `Result<(), String>` here, not Electron's `SelfModResult | null` —
-// there's no self-mod commit to report.
+// `agent_prompt` routes through `TurnCoordinator` (self-mod's commit/
+// typecheck wrapping — closing Phase 3's exit-criterion gap, spec #48: "chat
+// with Claude/Codex works through the Tauri build"), matching Electron's own
+// `agent:prompt` handler (`turns.runTurn(payload)`). `TurnCoordinator::run_turn`
+// is synchronous/blocking (it blocks on a per-cwd lock and, deep inside,
+// `AgentHostBridge::prompt`'s own `tauri::async_runtime::block_on`) — calling
+// it directly from this `async fn` would run that nested `block_on` from
+// within an already-running async task, which panics (the exact hazard
+// `AgentHostBridge`'s own doc comment warns about). `tauri::async_runtime::
+// spawn_blocking` moves the whole call onto a dedicated blocking-pool thread,
+// where nesting `block_on` is the standard, safe pattern.
+//
+// One known, pre-existing gap NOT closed here: `TurnPayload.images` reaches
+// `PromptOptions.images` (both now wired) but self-mod's turn-tracking (dirty
+// baseline, RunTracker's live subagent attribution / `self-mod:activity`)
+// still isn't broadcast anywhere — `run_typecheck`/`OverlayClient` ARE now
+// live, but nothing subscribes to `self-mod:activity`/`self-mod:validation`
+// on the Tauri side yet (self-mod.ts's own `onActivity`/`onValidation`
+// preload stubs still no-op under Tauri). Not required for the "chat works"
+// exit criterion; a follow-up chunk's job.
 
 use crate::agents::agent::{
     AgentErrorPayload, AgentKind, AgentUpdatePayload, AuthState, AvailableCommand, BackendStatus,
     ConfigOption, ConfigValue, ModeState, ModelState, PermissionOptionKind, PermissionRequest,
     PermissionRequestPayload, PromptCapabilities, PromptImage, Usage,
 };
-use crate::agents::agent_host::{AgentHostEngine, HostEvent, HostPromptOptions};
+use crate::agents::agent_host::{AgentHostBridge, AgentHostEngine, HostEvent};
 use crate::agents::login_presence;
+use crate::selfmod::overlay_client::OverlayClient;
 use crate::selfmod::shell_guard::is_source_mutating_shell;
+use crate::selfmod::validate;
+use crate::selfmod_commands::AppState;
+use crate::sessions_commands::SessionState;
+use crate::turn_coordinator::{TurnCoordinator, TurnCoordinatorDeps, TurnPayload};
 use serde::Serialize;
 use serde_json::Value;
+use std::path::Path;
 use std::sync::{Arc, OnceLock};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
-/// Owns the long-lived agent-chat engine for the app's lifetime. Registered
-/// via a second `app.manage(...)` call in `lib.rs`'s `setup` hook (separate
-/// from `selfmod_commands::AppState` — the two subsystems don't share state,
-/// and Tauri supports multiple managed types natively).
+pub type BoxedOverlayClient = OverlayClient<Box<dyn Fn() -> Option<String> + Send + Sync>>;
+
+/// Owns the long-lived agent-chat engine + self-mod-turn collaborators for
+/// the app's lifetime. Registered via a second `app.manage(...)` call in
+/// `lib.rs`'s `setup` hook (separate from `selfmod_commands::AppState`/
+/// `sessions_commands::SessionState` — each subsystem gets its own managed
+/// struct; Tauri supports multiple natively).
 pub struct AgentState {
     pub host: Arc<AgentHostEngine>,
+    pub bridge: Arc<AgentHostBridge>,
+    pub turn_coordinator: Arc<TurnCoordinator>,
+    pub overlay: Arc<BoxedOverlayClient>,
 }
 
 #[derive(Serialize)]
 pub struct AuthCommandDto {
     pub command: String,
+}
+
+/// The result of a self-mod-wrapped agent turn — Electron's `agent:prompt`
+/// resolves `SelfModResult | null`; this is that DTO. Mirrors
+/// `selfmod_commands.rs`'s `StepResultDto` pattern (reusing its own
+/// `reload_str` instead of duplicating the `ReloadKind` -> wire-string map).
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SelfModResultDto {
+    pub commit: String,
+    pub commits: Vec<String>,
+    pub changed_paths: Vec<String>,
+    pub reload: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub blocked_restart: Option<BlockedRestartDto>,
+    pub rejected_paths: Vec<String>,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BlockedRestartDto {
+    pub output: String,
+}
+
+impl From<crate::selfmod::service::SelfModResult> for SelfModResultDto {
+    fn from(r: crate::selfmod::service::SelfModResult) -> Self {
+        Self {
+            commit: r.commit,
+            commits: r.commits,
+            changed_paths: r.changed_paths,
+            reload: crate::selfmod_commands::reload_str(r.reload),
+            blocked_restart: r
+                .blocked_restart
+                .map(|b| BlockedRestartDto { output: b.output }),
+            rejected_paths: r.rejected_paths,
+        }
+    }
 }
 
 /// Source-write enforcement (W0b, user story 21): auto-reject a permission
@@ -174,28 +230,43 @@ pub fn emit_host_event(
 
 #[tauri::command]
 pub async fn agent_prompt(
-    state: tauri::State<'_, AgentState>,
+    app: AppHandle,
     session_id: String,
     cwd: Option<String>,
     text: String,
     images: Option<Vec<PromptImage>>,
-) -> Result<(), String> {
-    state
-        .host
-        .prompt(
-            &text,
-            HostPromptOptions {
-                key: Some(session_id),
-                cwd,
-                images: images.unwrap_or_default(),
-                resume_id: None,
+) -> Result<Option<SelfModResultDto>, String> {
+    let images = images.unwrap_or_default();
+    tauri::async_runtime::spawn_blocking(move || {
+        let agent_state = app.state::<AgentState>();
+        let selfmod_state = app.state::<AppState>();
+        let session_state = app.state::<SessionState>();
+        let payload = TurnPayload {
+            session_id,
+            cwd,
+            text,
+            images,
+        };
+        let deps = TurnCoordinatorDeps {
+            repo_root: selfmod_state.repo_root.clone(),
+            host: agent_state.bridge.as_ref(),
+            self_mod: &selfmod_state.self_mod,
+            sessions: session_state.store.as_ref(),
+            overlay: agent_state.overlay.as_ref(),
+            send: &|channel: &str, payload: Value| {
+                let _ = app.emit(channel, payload);
             },
-        )
-        .await
-        // The ACP session id `prompt` returns has nowhere to persist yet (no
-        // session store) — see this file's header comment.
-        .map(|_acp_session_id| ())
-        .map_err(|e| e.to_string())
+            typecheck: &|repo_root: &Path| {
+                validate::run_typecheck(repo_root, validate::DEFAULT_TIMEOUT)
+            },
+        };
+        agent_state
+            .turn_coordinator
+            .run_turn(&deps, payload)
+            .map(|opt| opt.map(SelfModResultDto::from))
+    })
+    .await
+    .map_err(|e| format!("agent_prompt task panicked: {e}"))?
 }
 
 #[tauri::command]

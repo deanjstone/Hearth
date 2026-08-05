@@ -26,6 +26,7 @@
 //     `JSON.stringify`) before re-throwing. Rust's `Result<_, String>` has
 //     no such ambiguity — see agent_host.rs's doc comment.
 
+use crate::agents::agent::PromptImage;
 use crate::agents::agent_host::{AgentHost, PromptOptions};
 use crate::selfmod::path_relevance::is_vite_trackable_path;
 use crate::selfmod::reload_driver::ReloadDriver;
@@ -48,7 +49,7 @@ pub struct TurnPayload {
     pub session_id: String,
     pub cwd: Option<String>,
     pub text: String,
-    // Image attachments aren't ported yet — see agent_host.rs's PromptOptions.
+    pub images: Vec<PromptImage>,
 }
 
 /// Narrow session-metadata surface this module needs — mirrors TS's
@@ -232,6 +233,7 @@ impl TurnCoordinator {
             key: key.clone(),
             cwd: Some(cwd.clone()),
             resume_id: meta.as_ref().and_then(|m| m.acp_session_id.clone()),
+            images: payload.images.clone(),
         };
 
         let prompt_result = deps.host.prompt(&payload.text, &opts);
@@ -479,6 +481,7 @@ mod tests {
             session_id: session_id.to_string(),
             cwd: None,
             text: text.to_string(),
+            images: Vec::new(),
         }
     }
 
@@ -704,6 +707,7 @@ mod tests {
                         session_id: "s3".to_string(),
                         cwd: Some("/other".to_string()),
                         text: "third".to_string(),
+                        images: Vec::new(),
                     },
                 )
             });
