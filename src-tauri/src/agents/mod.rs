@@ -1,6 +1,9 @@
+pub mod acp_client;
 pub mod acp_translate;
 pub mod agent;
 pub mod agent_host;
 pub mod child_env;
+pub mod claude;
+pub mod codex;
 pub mod fake;
 pub mod login_presence;
