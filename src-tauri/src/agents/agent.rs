@@ -144,7 +144,7 @@ pub struct Usage {
 }
 
 /// What the active backend accepts in a prompt beyond text.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PromptCapabilities {
     pub image: bool,

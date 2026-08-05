@@ -40,10 +40,14 @@ tiny_http = "0.12"
 # agents/ per the spec's standing decision; the rest of src-tauri/ (self-mod,
 # bridge, git) stays sync as before. "sync" for Mutex/oneshot (the permission
 # round-trip channel), "process" for spawning the adapter subprocess without
-# blocking, "time" for FakeAgent's scripted-turn pacing (fake.rs). Tauri's own
-# command dispatch already runs on a tokio runtime, so
-# code inside a Tauri command can `.await` these without spawning one itself.
-tokio = { version = "1", features = ["sync", "process", "time"] }
+# blocking, "time" for FakeAgent's scripted-turn pacing (fake.rs), "macros" for
+# `tokio::select!` (agent_host.rs races a turn against adapter death). Tauri's
+# own command dispatch already runs on a tokio runtime (and pulls in "rt"/
+# "rt-multi-thread", unified across the build by Cargo), so code inside a
+# Tauri command can `.await` these without spawning one itself, and
+# `tauri::async_runtime::block_on` (agent_host.rs's sync bridge for
+# turn_coordinator.rs) works even outside one.
+tokio = { version = "1", features = ["sync", "process", "time", "macros"] }
 # Dyn-compatible async trait methods (Agent/AgentSession are used as trait
 # objects behind AgentHost) — Rust's native async-fn-in-traits isn't object-safe
 # yet, and hand-rolling Pin<Box<dyn Future>> everywhere is worse than one small,
