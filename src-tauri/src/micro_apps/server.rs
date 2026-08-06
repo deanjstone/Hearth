@@ -173,11 +173,26 @@ impl MicroAppServer {
             .map(|a| a.vite_url.clone())
     }
 
+    /// Drop any tracked app whose child has actually exited — `server.ts`
+    /// registered `child.on('exit', () => running.delete(name))` for this;
+    /// `tokio::process::Child` has no exit callback, only a poll
+    /// (`try_wait`), so this is called from every read/start path instead of
+    /// once at spawn time. Without it, a Vite that crashes AFTER startup
+    /// (not during the read_loop below, which already handles that case)
+    /// leaves a stale entry forever: `list()` reports `running: true` for a
+    /// dead app, and `ensure_started` would keep handing out a URL fronting
+    /// nothing.
+    fn reap_dead(&self) {
+        let mut running = self.running.lock().unwrap();
+        running.retain(|_, app| !matches!(app.child.try_wait(), Ok(Some(_))));
+    }
+
     /// Start (or reuse) `name`'s Vite dev server, returning its own loopback
     /// URL. Idempotent: a second call while already running returns the
     /// existing URL without spawning anything.
     pub async fn ensure_started(&self, repo_root: &Path, name: &str) -> Result<String, String> {
         let name = assert_app_name(name)?;
+        self.reap_dead();
         if let Some(url) = self.vite_url(&name) {
             return Ok(url);
         }
@@ -278,6 +293,7 @@ impl MicroAppServer {
     /// a project), with whether each currently has a running dev server.
     /// Powers the Tools gallery.
     pub fn list(&self, repo_root: &Path) -> Vec<MicroAppInfo> {
+        self.reap_dead();
         let apps_dir = repo_root.join("micro-apps");
         let Ok(entries) = std::fs::read_dir(&apps_dir) else {
             return Vec::new();
@@ -299,6 +315,7 @@ impl MicroAppServer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::os::unix::fs::PermissionsExt;
 
     #[test]
     fn extract_dev_url_matches_a_plain_localhost_url_with_trailing_slash() {
@@ -389,6 +406,52 @@ mod tests {
         let server = MicroAppServer::new();
         let err = server.ensure_started(dir.path(), "nope").await.unwrap_err();
         assert!(err.contains("not found"), "unexpected error: {err}");
+    }
+
+    #[tokio::test]
+    async fn reap_dead_removes_an_app_whose_vite_process_exited_after_startup() {
+        // A "vite" that prints its URL then exits immediately — simulates a
+        // real crash-after-startup, which the read_loop in ensure_started
+        // (only watching stdout during the initial URL wait) never catches.
+        let dir = tempfile::tempdir().unwrap();
+        let app_dir = dir.path().join("micro-apps").join("flaky");
+        let bin_dir = app_dir.join("node_modules").join(".bin");
+        std::fs::create_dir_all(&bin_dir).unwrap();
+        std::fs::write(app_dir.join("package.json"), "{}").unwrap();
+        let script = bin_dir.join("vite");
+        std::fs::write(
+            &script,
+            "#!/bin/sh\necho 'Local: http://127.0.0.1:59999/'\nexit 0\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        let server = MicroAppServer::new();
+        let url = server.ensure_started(dir.path(), "flaky").await.unwrap();
+        assert_eq!(url, "http://127.0.0.1:59999/");
+
+        // Give the already-exiting fake vite a moment to actually finish,
+        // then confirm list() self-heals instead of reporting it forever.
+        let mut still_running = true;
+        for _ in 0..50 {
+            still_running = server
+                .list(dir.path())
+                .iter()
+                .any(|a| a.name == "flaky" && a.running);
+            if !still_running {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+        assert!(
+            !still_running,
+            "flaky was still reported running after its process exited"
+        );
+
+        // Re-starting after the reap spawns fresh rather than reusing a
+        // dead entry's (now-meaningless) cached URL.
+        let restarted = server.ensure_started(dir.path(), "flaky").await.unwrap();
+        assert_eq!(restarted, "http://127.0.0.1:59999/");
     }
 
     #[tokio::test]

@@ -347,6 +347,15 @@ fn ensure_offscreen(
         .focused(false)
         .visible(true)
         .build();
+        // W2 (Phase 6, tracking issue #27): this window boots the full app
+        // (this fn's own doc comment) and can route to /tools same as the
+        // main window, so it needs the same permission deny-all — see
+        // webview_hardening.rs's header comment for why this is a shared
+        // call, not a copy.
+        let result = result.and_then(|window| {
+            crate::webview_hardening::deny_all_permissions(&window)?;
+            Ok(window)
+        });
         let sent = match result {
             Ok(window) => {
                 *offscreen_for_main_thread.lock().unwrap() = Some(window);

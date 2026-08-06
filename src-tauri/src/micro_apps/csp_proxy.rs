@@ -87,12 +87,23 @@ pub struct CspProxyDeps {
 /// stop path instead of letting this fall out of scope.
 pub struct CspProxy {
     port: u16,
+    upstream_port: u16,
     shutdown: Option<oneshot::Sender<()>>,
 }
 
 impl CspProxy {
     pub fn port(&self) -> u16 {
         self.port
+    }
+
+    /// The Vite port this proxy currently forwards to. Callers reusing a
+    /// cached proxy (micro_apps_commands.rs's `micro_app_start`) need this
+    /// to detect a stale pairing — e.g. Vite crashed and was respawned on a
+    /// different port, but the proxy from before that respawn is still
+    /// cached and would silently forward to whatever now occupies its old
+    /// upstream port.
+    pub fn upstream_port(&self) -> u16 {
+        self.upstream_port
     }
 
     /// Stop accepting new connections. In-flight requests/splices are left
@@ -147,6 +158,7 @@ pub async fn start(upstream_port: u16, deps: CspProxyDeps) -> Result<CspProxy, S
 
     Ok(CspProxy {
         port,
+        upstream_port,
         shutdown: Some(shutdown_tx),
     })
 }

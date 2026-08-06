@@ -24,6 +24,7 @@ mod sessions_commands;
 mod terminal;
 mod terminal_commands;
 mod turn_coordinator;
+mod webview_hardening;
 mod workspaces_commands;
 
 use agent_commands::{AgentState, BoxedOverlayClient};
@@ -145,30 +146,10 @@ pub fn run() {
                 .get_webview_window("main")
                 .expect("the \"main\" window is declared in tauri.conf.json");
 
-            // W2 (Phase 6, tracking issue #27): deny every powerful device-
-            // permission request (camera, mic, geolocation, notifications,
-            // …) at the WebKitGTK layer. Micro-apps render as <iframe>s
-            // inside this one shell webview (src/shell/MicroAppFrame.tsx),
-            // so one handler here covers the shell AND every micro-app —
-            // no per-app wiring needed. Mirrors Electron's
-            // `session.setPermissionRequestHandler((..., cb) => cb(false))`
-            // posture, and reinforces WebKitGTK's own deny-unhandled-
-            // requests default rather than fighting it (#20's locked
-            // design).
-            #[cfg(target_os = "linux")]
-            {
-                use webkit2gtk::{PermissionRequestExt, WebViewExt};
-                window.with_webview(|webview| {
-                    webview.inner().connect_permission_request(|_webview, request| {
-                        request.deny();
-                        true
-                    });
-                })?;
-            }
-            #[cfg(not(target_os = "linux"))]
-            {
-                eprintln!("[hearth] permission deny-all is only implemented for WebKitGTK (Linux)");
-            }
+            // W2 (Phase 6, tracking issue #27) — see
+            // webview_hardening.rs's own header comment for why every
+            // WebviewWindow needs this call, not just this one.
+            webview_hardening::deny_all_permissions(&window)?;
 
             let driver = TauriReloadDriver::new(window);
             // Vite serves the renderer in dev — see HmrController's own doc

@@ -104,13 +104,23 @@ pub async fn micro_app_start(
         .ok_or_else(|| format!("micro-app {name}: dev URL {vite_url} has no port"))?;
 
     // Lock scoped to just the lookup so it's released before the `.await`
-    // below (a std Mutex guard can't be held across one).
+    // below (a std Mutex guard can't be held across one). A cached proxy
+    // whose upstream_port no longer matches is stale — Vite crashed and was
+    // respawned on a different port (server.rs's own reap-on-read) since
+    // this proxy was created — so it's dropped rather than reused; a proxy
+    // silently forwarding to whatever now occupies its old upstream port
+    // would be worse than the extra restart.
     let existing_port = micro_apps
         .proxies
         .lock()
         .unwrap()
         .get(&name)
-        .map(|p| p.port());
+        .and_then(|p| (p.upstream_port() == upstream_port).then(|| p.port()));
+    if existing_port.is_none() {
+        if let Some(stale) = micro_apps.proxies.lock().unwrap().remove(&name) {
+            stale.stop();
+        }
+    }
     let proxy_port = match existing_port {
         Some(port) => port,
         None => {

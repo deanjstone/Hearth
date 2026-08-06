@@ -60,7 +60,10 @@ jobs:
   # testing strategy locked in #25/#37): the HMR self-mod swap, undo/redo,
   # and the boot-watchdog revert, all driven against the actual built app via
   # tauri-driver + WebDriverIO — not the spike/ marker-harness, which stays a
-  # one-off risk-proving tool, not the permanent suite.
+  # one-off risk-proving tool, not the permanent suite. Also covers the
+  # view_app/eval_js bridge (Phase 2) and, as of Phase 6, the micro-app CSP
+  # proxy + permission-request deny-all (micro-app-csp-proxy.spec.js) — the
+  # third and last WebKitGTK-coupled behavior the testing strategy names.
   e2e:
     runs-on: ubuntu-latest
     steps:
