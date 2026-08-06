@@ -242,11 +242,21 @@ impl CapabilityStore {
         AppCapabilities { approved, pending }
     }
 
+    /// Per-key parsing, matching mcp/registry.rs's own `load` — a strict
+    /// whole-map `serde_json::from_str::<StoreShape>` would fail (and drop)
+    /// every app's grants if any ONE app's entry were malformed. Parsing
+    /// key-by-key means a single corrupt entry only loses that one app's
+    /// approved hosts.
     fn load(file_path: &Path) -> StoreShape {
         let Ok(text) = fs::read_to_string(file_path) else {
             return StoreShape::new();
         };
-        serde_json::from_str(&text).unwrap_or_default()
+        let Ok(raw) = serde_json::from_str::<BTreeMap<String, serde_json::Value>>(&text) else {
+            return StoreShape::new();
+        };
+        raw.into_iter()
+            .filter_map(|(k, v)| serde_json::from_value(v).ok().map(|entry| (k, entry)))
+            .collect()
     }
 
     /// Write-through-temp-then-rename, matching mcp/registry.rs's own
@@ -387,6 +397,23 @@ mod tests {
             .unwrap();
         store.revoke("my-app", None).unwrap();
         assert!(store.approved("my-app").is_empty());
+    }
+
+    #[test]
+    fn store_load_drops_only_the_malformed_entry_not_the_whole_map() {
+        let (_dir, file) = tmp_file();
+        fs::write(
+            &file,
+            serde_json::json!({
+                "good-app": { "approved": ["https://good.example.com"] },
+                "bad-app": { "approved": "not-an-array" },
+            })
+            .to_string(),
+        )
+        .unwrap();
+        let store = CapabilityStore::new(file);
+        assert_eq!(store.approved("good-app"), vec!["https://good.example.com"]);
+        assert!(store.approved("bad-app").is_empty());
     }
 
     #[test]

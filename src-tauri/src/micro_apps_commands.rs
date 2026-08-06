@@ -25,13 +25,19 @@ use std::sync::{Arc, Mutex};
 /// `AppState`/`AgentState`/`TerminalState`/`McpState` — each subsystem gets
 /// its own managed struct.
 pub struct MicroAppsState {
+    // `pub`, matching McpState's/TerminalState's own managed-struct
+    // convention (mcp_commands.rs, terminal_commands.rs) — each is a
+    // shared, already-Arc'd handle a caller outside this file could
+    // legitimately want direct access to (none does yet).
     pub servers: Arc<MicroAppServer>,
     pub capabilities: Arc<CapabilityStore>,
     pub broker: Arc<CredentialBroker>,
     /// One CSP proxy per currently-embedded app, keyed by name. Not folded
     /// into `MicroAppServer` — that module owns the Vite process lifecycle
     /// only; this is the orchestration layer pairing a running Vite server
-    /// with its own proxy.
+    /// with its own proxy. Kept private (unlike the fields above): it's
+    /// mutated in place behind its own lock, not a plain shared handle, so
+    /// only this file's own commands should ever touch it.
     proxies: Mutex<HashMap<String, CspProxy>>,
 }
 

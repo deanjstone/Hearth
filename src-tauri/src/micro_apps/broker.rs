@@ -290,6 +290,9 @@ fn respond_cors_text(request: Request, status: u16, body: &str) {
     let _ = request.respond(resp);
 }
 
+/// A verbatim copy of bridge.rs's own `header_value` — both are three-line
+/// `tiny_http::Request` helpers in one crate, not worth sharing across a
+/// module boundary neither file otherwise depends on.
 fn header_value(request: &Request, name: &str) -> Option<String> {
     request
         .headers()
