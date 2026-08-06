@@ -66,6 +66,12 @@ agent-client-protocol = "2.0.0"
 # backtracking regex features JS's native RegExp does, keeping this a faithful
 # port instead of a hand-rewritten reimplementation of the pattern's semantics.
 fancy-regex = "0.13"
+# Terminal (Phase 4, tracking issue #27) — `node-pty` -> `portable-pty`, the
+# wezterm project's cross-platform pty crate, per spec #26's Implementation
+# Decisions ("none of node-pty's surrounding logic is Electron-shaped"). This
+# is what removes the `electron-rebuild` native-module-ABI tax node-pty paid
+# on every dependency bump.
+portable-pty = "0.9"
 
 # This port targets WSL2/Linux only (per spec #26's scope decision), so the
 # WebKitGTK-specific snapshot primitive (bridge.rs's snapshot_window) is

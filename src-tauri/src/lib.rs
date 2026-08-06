@@ -17,6 +17,8 @@ mod selfmod;
 mod selfmod_commands;
 mod sessions;
 mod sessions_commands;
+mod terminal;
+mod terminal_commands;
 mod turn_coordinator;
 mod workspaces_commands;
 
@@ -75,6 +77,10 @@ pub fn run() {
             sessions_commands::sessions_delete,
             sessions_commands::sessions_duplicate,
             workspaces_commands::workspaces_list,
+            terminal_commands::terminal_create,
+            terminal_commands::terminal_write,
+            terminal_commands::terminal_resize,
+            terminal_commands::terminal_kill,
         ])
         .setup(|app| {
             // Not yet packaged (bundle.active is false in tauri.conf.json) — dev
@@ -194,6 +200,15 @@ pub fn run() {
                 agent_runtime_status: Mutex::new(agent_runtime_status),
             });
 
+            // Terminal (Phase 4, tracking issue #27): a real PTY per panel,
+            // output streamed to the renderer keyed by id. Mirrors
+            // electron/main/ipc.ts's own `new TerminalManager(...)` +
+            // app.manage() pattern already used for AgentState/SessionState
+            // above — its own managed struct, not folded into AppState.
+            app.manage(terminal_commands::TerminalState {
+                manager: terminal_commands::new_terminal_manager(app.handle().clone()),
+            });
+
             // The agent's view_app/read_ui/click/fill/eval_js bridge
             // (Hearth#27 Phase 2) — a loopback HTTP server, same shape as
             // electron/main/agent-bridge.ts. Needs the "main" window to
@@ -213,6 +228,11 @@ pub fn run() {
             // hanging, and aborts the event-drain task before the process
             // exits.
             if let tauri::RunEvent::ExitRequested { .. } = event {
+                // Mirrors electron/main/ipc.ts's `before-quit` handler:
+                // `terminals.disposeAll()` then `host.dispose()`.
+                if let Some(state) = app_handle.try_state::<terminal_commands::TerminalState>() {
+                    state.manager.dispose_all();
+                }
                 if let Some(state) = app_handle.try_state::<AgentState>() {
                     let host = state.host.clone();
                     tauri::async_runtime::block_on(host.dispose());

@@ -15,7 +15,9 @@
 // comment for why it's not a full registry port) — together these are what
 // `ChatView.tsx`'s `ensureActiveSession()` needs, so "chat with Claude/Codex
 // works through the Tauri build" (spec #48's Phase 3 exit criterion) is now
-// actually reachable end-to-end. Not the full ~90-method/20-namespace
+// actually reachable end-to-end. Phase 4 (tracking issue #27) adds `terminal`
+// (src-tauri/src/terminal_commands.rs), the `TerminalTab.tsx` PTY surface.
+// Not the full ~90-method/20-namespace
 // `HearthApi` surface (see spec #26's "IPC surface" decision — ported per
 // in-scope subsystem as it lands, not upfront). The cast below is
 // intentionally unsound today and will narrow to a real subset type, or fill
@@ -31,6 +33,7 @@ import { auth } from '../../electron/preload-tauri/auth.js'
 import { permission } from '../../electron/preload-tauri/permission.js'
 import { selfMod } from '../../electron/preload-tauri/self-mod.js'
 import { sessions } from '../../electron/preload-tauri/sessions.js'
+import { terminal } from '../../electron/preload-tauri/terminal.js'
 import { view } from '../../electron/preload-tauri/view.js'
 import { workspaces } from '../../electron/preload-tauri/workspaces.js'
 
@@ -41,5 +44,15 @@ declare global {
 }
 
 if (typeof window !== 'undefined' && window.__TAURI__ && !window.hearth) {
-  window.hearth = { selfMod, view, agentRuntime, agent, permission, auth, sessions, workspaces } as unknown as HearthApi
+  window.hearth = {
+    selfMod,
+    view,
+    agentRuntime,
+    agent,
+    permission,
+    auth,
+    sessions,
+    workspaces,
+    terminal,
+  } as unknown as HearthApi
 }
