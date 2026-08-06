@@ -16,6 +16,15 @@
 // WebKitGTK webview at startup (lib.rs's `setup()` — pure glue code with no
 // Rust-side test coverage of its own).
 //
+// The fixture app the running Tauri process resolves `micro-apps/<name>`
+// against is at `micro-apps/e2e-csp-fixture/` — but which directory the
+// process treats as its repo_root depends on tauri-driver's own launch cwd,
+// which capture-eval-bridge.spec.js's own `findBridgeDir` comment already
+// notes isn't something a spec controls (observed in CI: sometimes the git
+// root, sometimes e2e-tests/ itself, the cwd `pnpm run test` runs from).
+// `e2e-tests/micro-apps/e2e-csp-fixture` is a symlink back to the real one
+// (not a copy — avoids drift) so the fixture resolves correctly either way.
+//
 // Talks to the bridge exactly like capture-eval-bridge.spec.js. eval_js's
 // wrapper (bridge.rs's `wrap_eval_code`) substitutes the given code directly
 // into `(code)` — a single EXPRESSION position, not a statement sequence, so
