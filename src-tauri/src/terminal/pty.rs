@@ -235,11 +235,19 @@ impl<S: PtySpawner, Q: ShellQuery> TerminalManager<S, Q> {
             env,
             Box::new(move |data| on_data_cb(&id_for_data, &data)),
             Box::new(move || {
-                on_exit_cb(&id_for_exit);
-                terms
+                // Only fire the exit event if this id was still tracked —
+                // `kill()` already removed it (and, in pty.ts, unsubscribed
+                // before calling `proc.kill()`), so an explicit kill must
+                // not also emit a natural-exit event for a pane the caller
+                // already tore down.
+                let was_tracked = terms
                     .lock()
                     .expect("terminal manager's terms mutex poisoned")
-                    .remove(&id_for_cleanup);
+                    .remove(&id_for_cleanup)
+                    .is_some();
+                if was_tracked {
+                    on_exit_cb(&id_for_exit);
+                }
             }),
         )?;
 
@@ -496,6 +504,27 @@ mod tests {
 
         let (writes, _, _) = spawner.last_proc.lock().unwrap().clone().unwrap();
         assert_eq!(*writes.lock().unwrap(), vec!["echo hi\n".to_string()]);
+    }
+
+    #[test]
+    fn kill_suppresses_a_later_natural_exit_event() {
+        // Mirrors pty.ts's `kill()`, which unsubscribes before calling
+        // `proc.kill()` — an explicit kill must not also emit a
+        // natural-exit `terminal:exit` for a pane the caller already tore
+        // down (the underlying process's own exit-wait thread still fires
+        // eventually; the manager must not forward it).
+        let spawner = FakeSpawner::new();
+        let (manager, _data_rx, exit_rx) = manager_with(spawner.clone());
+        manager.create("t1", Path::new("/tmp"), 80, 24).unwrap();
+        let (_, _, on_exit) = spawner.captured.lock().unwrap().pop().unwrap();
+
+        manager.kill("t1");
+        on_exit(); // the "real" process's wait-thread firing after the kill
+
+        assert!(
+            exit_rx.recv_timeout(Duration::from_millis(200)).is_err(),
+            "no exit event should have fired"
+        );
     }
 
     #[test]

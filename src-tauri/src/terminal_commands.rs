@@ -60,19 +60,40 @@ pub fn new_terminal_manager(app: AppHandle) -> RealTerminalManager {
     )
 }
 
+/// Lexically collapse `.`/`..` components without touching the filesystem —
+/// the Rust equivalent of Node's `path.resolve()`, which `registry.ts`'s
+/// `contains()` uses before comparing (`electron/main/workspaces/registry.ts:83-90`).
+/// `Path::starts_with` alone is purely lexical and does NOT resolve `..`, so
+/// `/repo/../../etc` would otherwise pass a bare `starts_with(repo_root)`
+/// check — this closes that traversal.
+fn normalize_lexically(path: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for component in path.components() {
+        match component {
+            std::path::Component::ParentDir => {
+                out.pop();
+            }
+            std::path::Component::CurDir => {}
+            other => out.push(other.as_os_str()),
+        }
+    }
+    out
+}
+
 /// Resolve a caller-supplied cwd the same way `ipc.ts`'s `at(cwd)` helper
 /// does: an absent cwd defaults to the repo root; a cwd outside the
 /// registered workspace is rejected, so a compromised renderer can't spawn a
 /// shell in an arbitrary directory. Simplified vs `registry.ts`'s real
-/// `contains()` (no `resolve()`/canonicalization, since `workspaces_commands.rs`'s
-/// stub has exactly one workspace to check against — see its own header
-/// comment for why a full registry isn't ported here).
+/// `contains()` in one respect: only one workspace to check against
+/// (`workspaces_commands.rs`'s stub — see its own header comment for why a
+/// full registry isn't ported here), not multiple.
 fn resolve_cwd(repo_root: &Path, cwd: Option<&str>) -> Result<PathBuf, String> {
     match cwd {
         None => Ok(repo_root.to_path_buf()),
         Some(cwd) => {
-            let target = PathBuf::from(cwd);
-            if target.starts_with(repo_root) {
+            let target = normalize_lexically(&PathBuf::from(cwd));
+            let root = normalize_lexically(repo_root);
+            if target.starts_with(&root) {
                 Ok(target)
             } else {
                 Err(format!("cwd is not a registered workspace: {cwd}"))
@@ -85,12 +106,18 @@ fn resolve_cwd(repo_root: &Path, cwd: Option<&str>) -> Result<PathBuf, String> {
 pub fn terminal_create(
     id: String,
     cwd: Option<String>,
-    cols: u16,
-    rows: u16,
+    cols: Option<u16>,
+    rows: Option<u16>,
     app: AppHandle,
     state: tauri::State<AppState>,
     terminal: tauri::State<TerminalState>,
 ) {
+    // `electron/shared/channels.ts`'s wire payload types cols/rows as
+    // optional, defaulted by `TerminalManager.create(id, cwd, cols = 80,
+    // rows = 24)` on the TS side — matched here rather than requiring the
+    // caller to always supply them.
+    let cols = cols.unwrap_or(80);
+    let rows = rows.unwrap_or(24);
     let resolved = match resolve_cwd(&state.repo_root, cwd.as_deref()) {
         Ok(p) => p,
         Err(reason) => {
@@ -181,5 +208,23 @@ mod tests {
         // correctly rejects it.
         let repo_root = PathBuf::from("/repo");
         assert!(resolve_cwd(&repo_root, Some("/repo-evil")).is_err());
+    }
+
+    #[test]
+    fn resolve_cwd_rejects_a_dot_dot_traversal_out_of_the_repo_root() {
+        // A bare `Path::starts_with` is purely lexical and would let this
+        // through — normalize_lexically must collapse the `..`s first so the
+        // real escape (`/etc`) is what gets checked.
+        let repo_root = PathBuf::from("/repo");
+        assert!(resolve_cwd(&repo_root, Some("/repo/../../etc")).is_err());
+    }
+
+    #[test]
+    fn resolve_cwd_normalizes_dot_and_dot_dot_within_the_repo_root() {
+        let repo_root = PathBuf::from("/repo");
+        assert_eq!(
+            resolve_cwd(&repo_root, Some("/repo/src-tauri/../src")).unwrap(),
+            PathBuf::from("/repo/src")
+        );
     }
 }
