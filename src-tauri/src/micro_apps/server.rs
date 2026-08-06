@@ -455,6 +455,12 @@ mod tests {
     }
 
     #[tokio::test]
+    // Requires `pnpm` on PATH — true for a normal dev shell and the
+    // `checks`/`e2e` CI jobs (both run `pnpm/action-setup`), but not the
+    // `rust` job, which is deliberately Rust-toolchain-only. Same
+    // ignore-by-default precedent as agents/acp_client.rs's own `node`-
+    // dependent test.
+    #[ignore]
     async fn install_deps_does_not_run_a_postinstall_script() {
         // W4: a micro-app's package.json is agent-authored and untrusted.
         // Hermetic — no dependencies means no network needed for this test.
