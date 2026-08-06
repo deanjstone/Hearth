@@ -214,10 +214,9 @@ impl<Q: ShellQuery> LoginPathResolver<Q> {
 
     /// Whether `name` resolves on the (merged) login PATH — drives
     /// detect-and-hint in the connectors UI when `claude`/`codex` aren't
-    /// installed/visible (Phase 5's `mcp/active-connectors.rs`, not wired
-    /// yet — this mirrors `login-path.ts`'s own file boundary, which shares
-    /// this function between the terminal and the connectors surface).
-    #[allow(dead_code)]
+    /// installed/visible. Called from `mcp::active_connectors` (Phase 5) —
+    /// this mirrors `login-path.ts`'s own file boundary, which shares this
+    /// function between the terminal and the connectors surface.
     pub fn cli_resolves(&self, name: &str, base: &HashMap<String, String>, shell: &str) -> bool {
         let env = self.login_env(base, shell);
         self.query.which(name, &env)

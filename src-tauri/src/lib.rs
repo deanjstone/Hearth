@@ -10,6 +10,8 @@ mod agent_commands;
 mod agents;
 mod agents_commands;
 mod bridge;
+mod mcp;
+mod mcp_commands;
 mod ready;
 mod reload_driver_tauri;
 #[allow(dead_code)]
@@ -26,6 +28,8 @@ use agent_commands::{AgentState, BoxedOverlayClient};
 use agents::agent::{Agent, AgentAuth, AgentConfig, AgentKind};
 use agents::agent_host::{AgentFactory, AgentHostBridge, AgentHostEngine};
 use agents::startup_check;
+use mcp::registry::McpRegistry;
+use mcp_commands::McpState;
 use reload_driver_tauri::TauriReloadDriver;
 use selfmod::boot_watchdog::{BootDecision, BootWatchdog};
 use selfmod::git;
@@ -81,6 +85,13 @@ pub fn run() {
             terminal_commands::terminal_write,
             terminal_commands::terminal_resize,
             terminal_commands::terminal_kill,
+            mcp_commands::mcp_list,
+            mcp_commands::mcp_add,
+            mcp_commands::mcp_update,
+            mcp_commands::mcp_remove,
+            mcp_commands::mcp_set_enabled,
+            mcp_commands::mcp_test,
+            mcp_commands::connectors_active,
         ])
         .setup(|app| {
             // Not yet packaged (bundle.active is false in tauri.conf.json) — dev
@@ -207,6 +218,22 @@ pub fn run() {
             // above — its own managed struct, not folded into AppState.
             app.manage(terminal_commands::TerminalState {
                 manager: terminal_commands::new_terminal_manager(app.handle().clone()),
+            });
+
+            // MCP registry (Phase 5, tracking issue #27): user-configured
+            // MCP servers, JSON-persisted in their own app-scoped file —
+            // mirrors electron/main/index.ts's `new McpRegistry(join(dataDir,
+            // 'mcp-servers.json'))` + app.manage() pattern above. The
+            // `LoginPathResolver` here is its own long-lived instance (not
+            // shared with `TerminalState`'s) so its login-shell PATH cache
+            // actually pays off across repeated `connectors_active` calls.
+            let mcp_path = app.path().app_data_dir()?.join("mcp-servers.json");
+            app.manage(McpState {
+                registry: Arc::new(McpRegistry::new(mcp_path)),
+                login_resolver: terminal::login_path::LoginPathResolver::new(
+                    terminal::login_path::RealShellQuery,
+                    cfg!(target_os = "windows"),
+                ),
             });
 
             // The agent's view_app/read_ui/click/fill/eval_js bridge

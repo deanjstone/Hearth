@@ -19,8 +19,11 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # default-features off: the overlay client only ever posts to the local Vite dev
 # server over plain http://, so the tls stack ureq pulls in by default is dead
-# weight here.
-ureq = { version = "2", default-features = false, features = ["json"] }
+# weight here. "tls" is re-added below for mcp/probe.rs's http/sse
+# reachability check (Phase 5, tracking issue #27) — user-configured MCP
+# servers are real remote endpoints, usually https://, unlike the loopback-only
+# overlay client.
+ureq = { version = "2", default-features = false, features = ["json", "tls"] }
 # Raw kill(2) for process-group termination in validate.rs — shelling out to the
 # `kill` binary for a negative-pid (group) target was observed to silently no-op
 # in this dev environment (reports success, never signals the group); calling
@@ -47,7 +50,10 @@ tiny_http = "0.12"
 # Tauri command can `.await` these without spawning one itself, and
 # `tauri::async_runtime::block_on` (agent_host.rs's sync bridge for
 # turn_coordinator.rs) works even outside one.
-tokio = { version = "1", features = ["sync", "process", "time", "macros"] }
+#
+# "io-util" adds `AsyncWriteExt`/`AsyncBufReadExt`/`BufReader`, needed by
+# mcp/probe.rs's newline-delimited JSON-RPC stdio handshake (Phase 5).
+tokio = { version = "1", features = ["sync", "process", "time", "macros", "io-util"] }
 # Dyn-compatible async trait methods (Agent/AgentSession are used as trait
 # objects behind AgentHost) — Rust's native async-fn-in-traits isn't object-safe
 # yet, and hand-rolling Pin<Box<dyn Future>> everywhere is worse than one small,
