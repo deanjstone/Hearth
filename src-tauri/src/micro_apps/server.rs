@@ -37,12 +37,41 @@ struct RunningApp {
     vite_url: String,
 }
 
+/// Strip ANSI CSI escape sequences (`ESC [ ... <final byte>`, e.g. the SGR
+/// color/style codes `\x1b[32m`). Real Vite output (confirmed against CI's
+/// actual captured stdout — see extract_dev_url's own comment) wraps the
+/// port digits in their OWN escape codes, not just the surrounding text —
+/// e.g. `http://localhost:\x1b[1m5174\x1b[22m/` — so escape codes can land
+/// in the middle of the very substring being matched, not just around it.
+fn strip_ansi(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\u{1b}' && chars.peek() == Some(&'[') {
+            chars.next(); // consume the CSI introducer '[' itself — it's in
+                          // the same @-~ byte range as a real final byte
+                          // (e.g. 'm'), so it must be consumed separately
+                          // or the scan below would stop on it immediately.
+            for nc in chars.by_ref() {
+                if ('@'..='~').contains(&nc) {
+                    break; // the sequence's real final byte, e.g. 'm'
+                }
+            }
+            continue;
+        }
+        out.push(c);
+    }
+    out
+}
+
 /// Vite prints something like "  ➜  Local: http://localhost:5173/". Match
 /// the first loopback URL in a chunk, tolerating surrounding text and ANSI
 /// codes. Pure, unit-tested; hand-rolled rather than pulling in `regex`
 /// (fancy-regex is a dependency, but for backtracking features this simple
 /// anchored-literal scan doesn't need).
 pub fn extract_dev_url(chunk: &str) -> Option<String> {
+    let chunk = strip_ansi(chunk);
+    let chunk = chunk.as_str();
     const PREFIXES: [&str; 4] = [
         "http://localhost:",
         "https://localhost:",
@@ -417,6 +446,29 @@ mod tests {
             extract_dev_url(line),
             Some("http://localhost:5180/".to_string())
         );
+    }
+
+    #[test]
+    fn extract_dev_url_matches_when_the_port_digits_themselves_are_wrapped_in_ansi_codes() {
+        // Real Vite 6 output, captured verbatim from a CI failure: the port
+        // number gets its OWN bold escape codes, distinct from the ones
+        // around "Local:" and the URL scheme — escape codes land inside the
+        // very substring being matched, not just around it.
+        let line = "  \u{1b}[32m\u{1b}[1mVITE\u{1b}[22m v6.4.3\u{1b}[39m  \u{1b}[2mready in \u{1b}[0m\u{1b}[1m576\u{1b}[22m\u{1b}[2m\u{1b}[0m ms\u{1b}[22m\n\n  \u{1b}[32m➜\u{1b}[39m  \u{1b}[1mLocal\u{1b}[22m:   \u{1b}[36mhttp://localhost:\u{1b}[1m5174\u{1b}[22m/\u{1b}[39m";
+        assert_eq!(
+            extract_dev_url(line),
+            Some("http://localhost:5174/".to_string())
+        );
+    }
+
+    #[test]
+    fn strip_ansi_leaves_plain_text_untouched() {
+        assert_eq!(strip_ansi("hello world"), "hello world");
+    }
+
+    #[test]
+    fn strip_ansi_removes_multiple_codes_including_mid_token() {
+        assert_eq!(strip_ansi("\u{1b}[1m5174\u{1b}[22m"), "5174");
     }
 
     #[test]
