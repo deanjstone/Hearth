@@ -236,6 +236,19 @@ impl MicroAppServer {
         let stdout = child.stdout.take().expect("vite spawned with piped stdout");
         let mut lines = BufReader::new(stdout).lines();
 
+        // Captures every stdout/stderr line seen during startup (capped, so
+        // a runaway process can't grow this unboundedly) so a failure —
+        // timeout or otherwise — can report what vite actually said instead
+        // of a bare "no URL". Diagnostic-only: not used for anything but
+        // building the two error messages below. `eprintln!` also still
+        // goes to Hearth's own process stderr for a developer tailing it
+        // directly, but that stream isn't visible from e2e-tests/'s own CI
+        // logs (a separate process tauri-driver launches), which is why the
+        // capture below — surfaced through this fn's own `Err` — is what
+        // actually reaches a CI failure's log.
+        const CAPTURE_LIMIT: usize = 40;
+        let captured: std::sync::Arc<std::sync::Mutex<Vec<String>>> = Default::default();
+
         // Drain stderr for the process's whole lifetime, not just while
         // waiting for the URL. `Stdio::piped()` gives it a fixed-size OS
         // pipe buffer (~64KB on Linux) — if nothing ever reads it and vite
@@ -244,14 +257,19 @@ impl MicroAppServer {
         // vite hangs before ever printing its "Local:" URL to stdout. Found
         // via e2e-tests/specs/micro-app-csp-proxy.spec.js failing in CI
         // with "did not print a dev URL within 30s" while the same fixture
-        // started in under a second locally. Logged rather than silently
-        // discarded so a real crash's error output isn't lost.
+        // started in under a second locally.
         let stderr = child.stderr.take().expect("vite spawned with piped stderr");
         let stderr_app_name = name.clone();
+        let stderr_captured = captured.clone();
         tokio::spawn(async move {
             let mut stderr_lines = BufReader::new(stderr).lines();
             while let Ok(Some(line)) = stderr_lines.next_line().await {
                 eprintln!("[hearth] micro-app {stderr_app_name} (vite stderr): {line}");
+                let mut buf = stderr_captured.lock().unwrap();
+                if buf.len() >= CAPTURE_LIMIT {
+                    buf.remove(0);
+                }
+                buf.push(format!("stderr: {line}"));
             }
         });
 
@@ -259,6 +277,13 @@ impl MicroAppServer {
             loop {
                 match lines.next_line().await {
                     Ok(Some(line)) => {
+                        {
+                            let mut buf = captured.lock().unwrap();
+                            if buf.len() >= CAPTURE_LIMIT {
+                                buf.remove(0);
+                            }
+                            buf.push(format!("stdout: {line}"));
+                        }
                         if let Some(url) = extract_dev_url(&line) {
                             return Ok(url);
                         }
@@ -269,8 +294,14 @@ impl MicroAppServer {
                             .as_ref()
                             .map(exit_desc)
                             .unwrap_or_else(|| "unknown exit".to_string());
+                        let snapshot = captured.lock().unwrap().join("\n");
+                        let detail = if snapshot.is_empty() {
+                            String::new()
+                        } else {
+                            format!(":\n{snapshot}")
+                        };
                         return Err(format!(
-                            "micro-app {name} vite exited ({desc}) before printing a URL"
+                            "micro-app {name} vite exited ({desc}) before printing a URL{detail}"
                         ));
                     }
                     Err(e) => return Err(format!("micro-app {name} vite stdout error: {e}")),
@@ -286,8 +317,14 @@ impl MicroAppServer {
             }
             Err(_elapsed) => {
                 let _ = child.start_kill();
+                let snapshot = captured.lock().unwrap().join("\n");
+                let detail = if snapshot.is_empty() {
+                    " (no output captured)".to_string()
+                } else {
+                    format!(":\n{snapshot}")
+                };
                 return Err(format!(
-                    "micro-app {name} did not print a dev URL within {}s",
+                    "micro-app {name} did not print a dev URL within {}s{detail}",
                     START_TIMEOUT.as_secs()
                 ));
             }
