@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-sessions-create"
+description = "Enables the sessions_create command without any pre-configured scope."
+commands.allow = ["sessions_create"]
+
+[[permission]]
+identifier = "deny-sessions-create"
+description = "Denies the sessions_create command without any pre-configured scope."
+commands.deny = ["sessions_create"]

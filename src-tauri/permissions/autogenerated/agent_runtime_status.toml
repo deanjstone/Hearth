@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-agent-runtime-status"
+description = "Enables the agent_runtime_status command without any pre-configured scope."
+commands.allow = ["agent_runtime_status"]
+
+[[permission]]
+identifier = "deny-agent-runtime-status"
+description = "Denies the agent_runtime_status command without any pre-configured scope."
+commands.deny = ["agent_runtime_status"]

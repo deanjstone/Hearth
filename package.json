@@ -8,7 +8,8 @@
   "author": "Jordan Stella <jordanjstella@gmail.com>",
   "main": "out/main/index.js",
   "scripts": {
-    "dev": "electron-vite dev --watch",
+    "dev": "cd src-tauri && cargo tauri dev",
+    "dev:electron": "electron-vite dev --watch",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "dev:tauri-frontend": "vite --config vite.config.tauri.ts",

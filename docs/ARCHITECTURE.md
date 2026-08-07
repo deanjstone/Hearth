@@ -1,5 +1,18 @@
 # Hearth — Architecture
 
+> **Stale as of the Phase 7 Electron→Tauri cutover** (tracking issue
+> [#27](https://github.com/deanjstone/Hearth/issues/27),
+> [ADR-001](decisions/adr-001-electron-to-tauri-cutover.md)). Everything
+> below describes the pre-cutover Electron shell (`electron/main/**`,
+> `electron/preload/**`), which is retired from active use but kept in the
+> repo as a rollback path — see `CLAUDE.md`. The live shell is Rust/Tauri
+> (`src-tauri/**`); a full rewrite of this document to match is tracked in
+> [Hearth#55](https://github.com/deanjstone/Hearth/issues/55) rather than
+> attempted inline with the cutover itself. Until then, treat file paths
+> below as historical, and cross-reference the real
+> current module under `src-tauri/src/` (e.g. `electron/main/self-mod/` →
+> `src-tauri/src/selfmod/`, `electron/main/mcp/` → `src-tauri/src/mcp/`).
+
 A self-evolving macOS desktop client for coding agents (Claude Code, Codex)
 driven over the Agent Client Protocol (ACP).
 

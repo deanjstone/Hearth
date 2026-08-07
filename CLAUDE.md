@@ -5,8 +5,16 @@ it, **this repo is the running app** and you may be asked to change its own UI.
 
 - The renderer (`src/**`) is served by a live Vite dev server, so your edits
   **hot-reload into the running app** — no restart needed.
-- Avoid editing `electron/main/**` and `electron/preload/**` unless the task truly
-  needs it: those restart the whole app.
+- The live shell is **Rust/Tauri** (`src-tauri/**`), not Electron, as of the
+  Phase 7 cutover (tracking issue #27). `electron/main/**` and
+  `electron/preload/**` are retired from active use (kept in git history —
+  see `docs/decisions/` for the cutover ADR) — there is no reason to edit
+  them. Editing `electron/preload-tauri/**` or `src/lib/hearth-bridge-tauri.ts`
+  is the equivalent of "editing preload" for this shell.
+- Editing `src-tauri/**` needs a real recompile + process restart — it does
+  **not** hot-reload, unlike `src/**`. `cargo tauri dev` (via `pnpm dev`)
+  auto-restarts on Rust-side changes; this is slower than a renderer edit,
+  so prefer changes in `src/**` when the task allows it.
 - Your edits are auto-committed as `Hearth-SelfMod` git commits and are revertable
   from the app's History view, so make focused changes.
 

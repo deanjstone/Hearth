@@ -16,6 +16,13 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 dirs = "6"
 serde = { version = "1", features = ["derive"] }
+# Local-timezone "next daily HH:MM occurrence" math for routines/schedule.rs
+# (Phase 7, tracking issue #27) — a faithful port of schedule.ts's
+# `computeNextRun`, which builds a same-day local Date and rolls to tomorrow
+# if it's already past. std has no local-timezone calendar API; chrono's
+# `Local` is the well-established crate for this. Default features (incl.
+# "clock") are fine here — no tz-database bloat, just the OS-reported offset.
+chrono = "0.4"
 serde_json = "1"
 # Origin/hostname parsing for micro_apps/capabilities.rs's `normalizeHost`
 # port and micro_apps/broker.rs's target-URL validation (Phase 6, tracking

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-git-switch-branch"
+description = "Enables the git_switch_branch command without any pre-configured scope."
+commands.allow = ["git_switch_branch"]
+
+[[permission]]
+identifier = "deny-git-switch-branch"
+description = "Denies the git_switch_branch command without any pre-configured scope."
+commands.deny = ["git_switch_branch"]

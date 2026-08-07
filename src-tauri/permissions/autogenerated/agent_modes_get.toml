@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-agent-modes-get"
+description = "Enables the agent_modes_get command without any pre-configured scope."
+commands.allow = ["agent_modes_get"]
+
+[[permission]]
+identifier = "deny-agent-modes-get"
+description = "Denies the agent_modes_get command without any pre-configured scope."
+commands.deny = ["agent_modes_get"]

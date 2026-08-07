@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-sessions-duplicate"
+description = "Enables the sessions_duplicate command without any pre-configured scope."
+commands.allow = ["sessions_duplicate"]
+
+[[permission]]
+identifier = "deny-sessions-duplicate"
+description = "Denies the sessions_duplicate command without any pre-configured scope."
+commands.deny = ["sessions_duplicate"]

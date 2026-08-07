@@ -10,17 +10,28 @@ mod agent_commands;
 mod agents;
 mod agents_commands;
 mod bridge;
+mod fs_commands;
+mod git_commands;
+mod git_panel;
 mod mcp;
 mod mcp_commands;
 mod micro_apps;
 mod micro_apps_commands;
+mod misc_commands;
 mod ready;
 mod reload_driver_tauri;
+mod reveal;
+mod routines;
+mod routines_commands;
 #[allow(dead_code)]
 mod selfmod;
 mod selfmod_commands;
 mod sessions;
 mod sessions_commands;
+mod skills;
+mod skills_commands;
+mod soul;
+mod soul_commands;
 mod terminal;
 mod terminal_commands;
 mod turn_coordinator;
@@ -47,7 +58,7 @@ use selfmod_commands::AppState;
 use sessions::store::SessionStore;
 use sessions_commands::SessionState;
 use std::sync::{Arc, Mutex, OnceLock};
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 use turn_coordinator::TurnCoordinator;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -99,6 +110,34 @@ pub fn run() {
             mcp_commands::mcp_set_enabled,
             mcp_commands::mcp_test,
             mcp_commands::connectors_active,
+            fs_commands::fs_list,
+            fs_commands::fs_read,
+            fs_commands::fs_write,
+            skills_commands::skills_list,
+            skills_commands::skills_reveal,
+            skills_commands::skills_set_enabled,
+            soul_commands::personality_get,
+            soul_commands::personality_set,
+            soul_commands::memory_get,
+            soul_commands::memory_clear,
+            routines_commands::routines_list,
+            routines_commands::routines_create,
+            routines_commands::routines_update,
+            routines_commands::routines_set_enabled,
+            routines_commands::routines_delete,
+            routines_commands::routines_run_now,
+            misc_commands::about_info,
+            misc_commands::data_reveal,
+            misc_commands::logs_reveal,
+            misc_commands::window_zoom_toggle,
+            git_commands::git_diff,
+            git_commands::git_status,
+            git_commands::git_stage,
+            git_commands::git_unstage,
+            git_commands::git_commit,
+            git_commands::git_branches,
+            git_commands::git_switch_branch,
+            git_commands::git_create_pr,
             micro_apps_commands::micro_app_create,
             micro_apps_commands::micro_app_list,
             micro_apps_commands::micro_app_starters,
@@ -284,6 +323,26 @@ pub fn run() {
                 eprintln!("[hearth] micro-app credential broker failed to start: {e}");
             }
             app.manage(MicroAppsState::new(Arc::new(MicroAppServer::new()), capabilities, broker));
+
+            // Routines (Phase 7, tracking issue #27): scheduled/automated
+            // agent runs, JSON-persisted in their own app-scoped file
+            // mirroring McpRegistry's/CapabilityStore's own pattern above.
+            // `on_due` pushes over the same `routines:due` channel string
+            // Electron's `scheduler.ts` construction site sends on.
+            let routines_dir = app.path().app_data_dir()?.join("routines");
+            let routine_store = Arc::new(routines::store::RoutineStore::new(routines_dir));
+            let due_handle = app.handle().clone();
+            let routine_scheduler = Arc::new(routines::scheduler::RoutineScheduler::new(
+                routine_store.clone(),
+                move |routine| {
+                    let _ = due_handle.emit("routines:due", routine);
+                },
+            ));
+            routines::scheduler::spawn_ticker(routine_scheduler.clone(), std::time::Duration::from_secs(30));
+            app.manage(routines_commands::RoutinesState {
+                store: routine_store,
+                scheduler: routine_scheduler,
+            });
 
             Ok(())
         })

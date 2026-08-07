@@ -5,7 +5,33 @@ import type { BrowserState } from '../../../electron/main/browser/browser-view'
 
 const EMPTY: BrowserState = { url: '', title: '', loading: false, canGoBack: false, canGoForward: false }
 
+declare global {
+  interface Window {
+    __TAURI__?: unknown
+  }
+}
+
 export function BrowserTab() {
+  // The embedded browser is an Electron WebContentsView painted over this
+  // tab by main; Tauri has no equivalent primitive, and porting one is out
+  // of scope for this MVP (Phase 7, tracking issue #27's IPC-scope triage).
+  // Gate here rather than mounting the no-op window.hearth.browser stub for
+  // real — a live-looking but non-functional URL bar is more confusing than
+  // a clear "not available" notice.
+  if (typeof window !== 'undefined' && window.__TAURI__) {
+    return (
+      <div className="bview">
+        <div className="bview-canvas" style={{ background: 'var(--bg-inset)', display: 'grid', placeItems: 'center', color: 'var(--text-muted)' }}>
+          Browser tab is not available in this build.
+        </div>
+      </div>
+    )
+  }
+
+  return <BrowserTabElectron />
+}
+
+function BrowserTabElectron() {
   const active = useSession((s) => s.active)
   const [state, setState] = useState<BrowserState>(EMPTY)
   const [draft, setDraft] = useState('')

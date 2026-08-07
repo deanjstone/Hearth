@@ -31,16 +31,27 @@
 // is safe regardless of which shell the renderer is actually running under.
 
 import type { HearthApi } from '../../electron/preload/index.js'
+import { about } from '../../electron/preload-tauri/about.js'
 import { agent } from '../../electron/preload-tauri/agent.js'
 import { agentRuntime } from '../../electron/preload-tauri/agent-runtime.js'
 import { auth } from '../../electron/preload-tauri/auth.js'
+import { browser } from '../../electron/preload-tauri/browser.js'
+import { data } from '../../electron/preload-tauri/data.js'
+import { files } from '../../electron/preload-tauri/files.js'
+import { git } from '../../electron/preload-tauri/git.js'
 import { mcp } from '../../electron/preload-tauri/mcp.js'
 import { microApps } from '../../electron/preload-tauri/micro-apps.js'
+import { memory, personality } from '../../electron/preload-tauri/personality.js'
 import { permission } from '../../electron/preload-tauri/permission.js'
+import { routines } from '../../electron/preload-tauri/routines.js'
+import { secrets } from '../../electron/preload-tauri/secrets.js'
 import { selfMod } from '../../electron/preload-tauri/self-mod.js'
 import { sessions } from '../../electron/preload-tauri/sessions.js'
+import { skills } from '../../electron/preload-tauri/skills.js'
 import { terminal } from '../../electron/preload-tauri/terminal.js'
+import { update } from '../../electron/preload-tauri/update.js'
 import { view } from '../../electron/preload-tauri/view.js'
+import { win } from '../../electron/preload-tauri/win.js'
 import { workspaces } from '../../electron/preload-tauri/workspaces.js'
 
 declare global {
@@ -62,5 +73,20 @@ if (typeof window !== 'undefined' && window.__TAURI__ && !window.hearth) {
     terminal,
     mcp,
     microApps,
+    // Phase 7 (tracking issue #27): real ports.
+    git,
+    files,
+    skills,
+    personality,
+    memory,
+    routines,
+    about,
+    data,
+    win,
+    // Phase 7: deliberately unported for this MVP — safe stubs so nothing
+    // throws (see each shim's own header comment for why).
+    browser,
+    secrets,
+    update,
   } as unknown as HearthApi
 }
