@@ -98,24 +98,31 @@ pub async fn micro_app_start(
         .servers
         .ensure_started(&state.repo_root, &name)
         .await?;
-    let upstream_port = url::Url::parse(&vite_url)
-        .map_err(|e| format!("micro-app {name}: unparseable dev URL {vite_url}: {e}"))?
+    let vite_parsed = url::Url::parse(&vite_url)
+        .map_err(|e| format!("micro-app {name}: unparseable dev URL {vite_url}: {e}"))?;
+    // Whatever host Vite itself reported (usually "localhost"), not a
+    // hardcoded "127.0.0.1" — Vite (no --host flag) binds whatever
+    // "localhost" resolves to on this machine, which on some CI runners is
+    // ::1 (IPv6-only). csp_proxy::start connects by this name so tokio's own
+    // resolver matches whatever Vite actually bound to.
+    let upstream_host = vite_parsed
+        .host_str()
+        .ok_or_else(|| format!("micro-app {name}: dev URL {vite_url} has no host"))?
+        .to_string();
+    let upstream_port = vite_parsed
         .port()
         .ok_or_else(|| format!("micro-app {name}: dev URL {vite_url} has no port"))?;
 
     // Lock scoped to just the lookup so it's released before the `.await`
     // below (a std Mutex guard can't be held across one). A cached proxy
-    // whose upstream_port no longer matches is stale — Vite crashed and was
-    // respawned on a different port (server.rs's own reap-on-read) since
-    // this proxy was created — so it's dropped rather than reused; a proxy
-    // silently forwarding to whatever now occupies its old upstream port
-    // would be worse than the extra restart.
-    let existing_port = micro_apps
-        .proxies
-        .lock()
-        .unwrap()
-        .get(&name)
-        .and_then(|p| (p.upstream_port() == upstream_port).then(|| p.port()));
+    // whose upstream host:port no longer matches is stale — Vite crashed
+    // and was respawned on a different port (server.rs's own reap-on-read)
+    // since this proxy was created — so it's dropped rather than reused; a
+    // proxy silently forwarding to whatever now occupies its old upstream
+    // port would be worse than the extra restart.
+    let existing_port = micro_apps.proxies.lock().unwrap().get(&name).and_then(|p| {
+        (p.upstream_host() == upstream_host && p.upstream_port() == upstream_port).then(|| p.port())
+    });
     if existing_port.is_none() {
         if let Some(stale) = micro_apps.proxies.lock().unwrap().remove(&name) {
             stale.stop();
@@ -129,6 +136,7 @@ pub async fn micro_app_start(
             let broker_origin: Arc<dyn Fn() -> Option<String> + Send + Sync> =
                 Arc::new(move || broker.origin());
             let proxy = csp_proxy::start(
+                upstream_host,
                 upstream_port,
                 CspProxyDeps {
                     app_name: name.clone(),

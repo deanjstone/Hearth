@@ -64,7 +64,8 @@ pub fn build_micro_app_csp(
 
 struct ProxyState {
     self_origin: String,
-    upstream_addr: SocketAddr,
+    upstream_host: String,
+    upstream_port: u16,
     app_name: String,
     capabilities: Arc<CapabilityStore>,
     broker_origin: Arc<dyn Fn() -> Option<String> + Send + Sync>,
@@ -87,6 +88,7 @@ pub struct CspProxyDeps {
 /// stop path instead of letting this fall out of scope.
 pub struct CspProxy {
     port: u16,
+    upstream_host: String,
     upstream_port: u16,
     shutdown: Option<oneshot::Sender<()>>,
 }
@@ -96,14 +98,18 @@ impl CspProxy {
         self.port
     }
 
-    /// The Vite port this proxy currently forwards to. Callers reusing a
-    /// cached proxy (micro_apps_commands.rs's `micro_app_start`) need this
+    /// The Vite host:port this proxy currently forwards to. Callers reusing
+    /// a cached proxy (micro_apps_commands.rs's `micro_app_start`) need this
     /// to detect a stale pairing — e.g. Vite crashed and was respawned on a
     /// different port, but the proxy from before that respawn is still
     /// cached and would silently forward to whatever now occupies its old
     /// upstream port.
     pub fn upstream_port(&self) -> u16 {
         self.upstream_port
+    }
+
+    pub fn upstream_host(&self) -> &str {
+        &self.upstream_host
     }
 
     /// Stop accepting new connections. In-flight requests/splices are left
@@ -117,11 +123,21 @@ impl CspProxy {
 }
 
 /// Start a proxy on an OS-assigned loopback port, forwarding to
-/// `127.0.0.1:upstream_port`. Injects/replaces the CSP header on normal
-/// responses and transparently splices Vite's HMR WebSocket upgrade — the
-/// two behaviors spike/tauri-csp-proxy/ (wayfinder ticket #22) validated on
-/// WebKitGTK.
-pub async fn start(upstream_port: u16, deps: CspProxyDeps) -> Result<CspProxy, String> {
+/// `upstream_host:upstream_port` — Vite's own reported host, NOT hardcoded
+/// to `127.0.0.1`: Vite (no `--host` flag) binds whatever "localhost"
+/// resolves to on this machine, which on some CI runners is `::1`
+/// (IPv6-only), not `127.0.0.1`. Connecting by name lets tokio's own
+/// resolver match whatever Vite actually bound to, rather than assuming
+/// IPv4. Injects/replaces the CSP header on normal responses and
+/// transparently splices Vite's HMR WebSocket upgrade — the two behaviors
+/// spike/tauri-csp-proxy/ (wayfinder ticket #22) validated on WebKitGTK
+/// (against a `127.0.0.1`-bound upstream there, hence the literal address —
+/// this generalizes it for the real, host-name-reported case).
+pub async fn start(
+    upstream_host: String,
+    upstream_port: u16,
+    deps: CspProxyDeps,
+) -> Result<CspProxy, String> {
     let listener = TcpListener::bind("127.0.0.1:0")
         .await
         .map_err(|e| format!("csp-proxy: failed to bind a listen port: {e}"))?;
@@ -129,7 +145,8 @@ pub async fn start(upstream_port: u16, deps: CspProxyDeps) -> Result<CspProxy, S
 
     let state = Arc::new(ProxyState {
         self_origin: format!("http://127.0.0.1:{port}"),
-        upstream_addr: SocketAddr::from(([127, 0, 0, 1], upstream_port)),
+        upstream_host: upstream_host.clone(),
+        upstream_port,
         app_name: deps.app_name,
         capabilities: deps.capabilities,
         broker_origin: deps.broker_origin,
@@ -158,6 +175,7 @@ pub async fn start(upstream_port: u16, deps: CspProxyDeps) -> Result<CspProxy, S
 
     Ok(CspProxy {
         port,
+        upstream_host,
         upstream_port,
         shutdown: Some(shutdown_tx),
     })
@@ -198,16 +216,17 @@ async fn handle(
     // this is the client-side half of the upgrade.
     let client_upgrade = is_ws.then(|| hyper::upgrade::on(&mut req));
 
-    let upstream_stream = match TcpStream::connect(state.upstream_addr).await {
-        Ok(s) => s,
-        Err(err) => {
-            eprintln!(
-                "[hearth] csp-proxy[{}][{peer}]: upstream connect failed for {path}: {err}",
-                state.app_name
-            );
-            return Ok(bad_gateway("upstream connect failed"));
-        }
-    };
+    let upstream_stream =
+        match TcpStream::connect((state.upstream_host.as_str(), state.upstream_port)).await {
+            Ok(s) => s,
+            Err(err) => {
+                eprintln!(
+                    "[hearth] csp-proxy[{}][{peer}]: upstream connect failed for {path}: {err}",
+                    state.app_name
+                );
+                return Ok(bad_gateway("upstream connect failed"));
+            }
+        };
     let upstream_io = TokioIo::new(upstream_stream);
     let (mut sender, conn) = match hyper::client::conn::http1::handshake(upstream_io).await {
         Ok(pair) => pair,
@@ -380,6 +399,7 @@ mod tests {
             tempfile::tempdir().unwrap().path().join("caps.json"),
         ));
         let proxy = start(
+            "127.0.0.1".to_string(),
             upstream_port,
             CspProxyDeps {
                 app_name: "my-app".to_string(),
@@ -425,6 +445,7 @@ mod tests {
         let caps_path = tempfile::tempdir().unwrap().path().join("caps.json");
         let capabilities = Arc::new(CapabilityStore::new(caps_path));
         let proxy = start(
+            "127.0.0.1".to_string(),
             upstream_port,
             CspProxyDeps {
                 app_name: "my-app".to_string(),
