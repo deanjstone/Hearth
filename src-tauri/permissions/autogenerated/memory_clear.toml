@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-memory-clear"
+description = "Enables the memory_clear command without any pre-configured scope."
+commands.allow = ["memory_clear"]
+
+[[permission]]
+identifier = "deny-memory-clear"
+description = "Denies the memory_clear command without any pre-configured scope."
+commands.deny = ["memory_clear"]

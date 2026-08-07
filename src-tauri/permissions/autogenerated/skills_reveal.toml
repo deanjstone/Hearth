@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-skills-reveal"
+description = "Enables the skills_reveal command without any pre-configured scope."
+commands.allow = ["skills_reveal"]
+
+[[permission]]
+identifier = "deny-skills-reveal"
+description = "Denies the skills_reveal command without any pre-configured scope."
+commands.deny = ["skills_reveal"]

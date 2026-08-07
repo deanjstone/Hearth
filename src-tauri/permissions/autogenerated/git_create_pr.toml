@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-git-create-pr"
+description = "Enables the git_create_pr command without any pre-configured scope."
+commands.allow = ["git_create_pr"]
+
+[[permission]]
+identifier = "deny-git-create-pr"
+description = "Denies the git_create_pr command without any pre-configured scope."
+commands.deny = ["git_create_pr"]

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-personality-get"
+description = "Enables the personality_get command without any pre-configured scope."
+commands.allow = ["personality_get"]
+
+[[permission]]
+identifier = "deny-personality-get"
+description = "Denies the personality_get command without any pre-configured scope."
+commands.deny = ["personality_get"]
