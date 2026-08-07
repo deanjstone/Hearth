@@ -12,6 +12,8 @@ mod agents_commands;
 mod bridge;
 mod mcp;
 mod mcp_commands;
+mod micro_apps;
+mod micro_apps_commands;
 mod ready;
 mod reload_driver_tauri;
 #[allow(dead_code)]
@@ -22,6 +24,7 @@ mod sessions_commands;
 mod terminal;
 mod terminal_commands;
 mod turn_coordinator;
+mod webview_hardening;
 mod workspaces_commands;
 
 use agent_commands::{AgentState, BoxedOverlayClient};
@@ -30,6 +33,10 @@ use agents::agent_host::{AgentFactory, AgentHostBridge, AgentHostEngine};
 use agents::startup_check;
 use mcp::registry::McpRegistry;
 use mcp_commands::McpState;
+use micro_apps::broker::{CredentialBroker, NullSecretLookup};
+use micro_apps::capabilities::CapabilityStore;
+use micro_apps::server::MicroAppServer;
+use micro_apps_commands::MicroAppsState;
 use reload_driver_tauri::TauriReloadDriver;
 use selfmod::boot_watchdog::{BootDecision, BootWatchdog};
 use selfmod::git;
@@ -92,6 +99,14 @@ pub fn run() {
             mcp_commands::mcp_set_enabled,
             mcp_commands::mcp_test,
             mcp_commands::connectors_active,
+            micro_apps_commands::micro_app_create,
+            micro_apps_commands::micro_app_list,
+            micro_apps_commands::micro_app_starters,
+            micro_apps_commands::micro_app_start,
+            micro_apps_commands::micro_app_stop,
+            micro_apps_commands::micro_app_capabilities,
+            micro_apps_commands::micro_app_approve,
+            micro_apps_commands::micro_app_revoke,
         ])
         .setup(|app| {
             // Not yet packaged (bundle.active is false in tauri.conf.json) — dev
@@ -130,6 +145,12 @@ pub fn run() {
             let window = app
                 .get_webview_window("main")
                 .expect("the \"main\" window is declared in tauri.conf.json");
+
+            // W2 (Phase 6, tracking issue #27) — see
+            // webview_hardening.rs's own header comment for why every
+            // WebviewWindow needs this call, not just this one.
+            webview_hardening::deny_all_permissions(&window)?;
+
             let driver = TauriReloadDriver::new(window);
             // Vite serves the renderer in dev — see HmrController's own doc
             // comment for why that means the covered/full-reload morph path is
@@ -243,6 +264,27 @@ pub fn run() {
             // and eval_js), so this runs after the window above is created.
             bridge::start(app.handle().clone(), bridge_repo_root);
 
+            // Micro-app sandbox (Phase 6, tracking issue #27): egress
+            // capability grants (W6), JSON-persisted in their own
+            // app-scoped file mirroring McpRegistry's own pattern just
+            // above; the credential broker (W7), started eagerly like
+            // bridge::start so its loopback origin is stable for the whole
+            // app lifetime; and the Vite-dev-server + CSP-proxy
+            // orchestrator (micro_apps_commands::MicroAppsState) the
+            // `micro_app_*` commands operate on. `NullSecretLookup`: real
+            // secrets-backed credential injection is out of scope for this
+            // MVP (spec #26's Out of Scope), same standing gap
+            // mcp/to_acp.rs's own `NullSecretLookup` already carries — every
+            // `microapp.<origin>`-keyed credential honestly reports absent
+            // rather than silently bypassing auth.
+            let capabilities_path = app.path().app_data_dir()?.join("micro-app-capabilities.json");
+            let capabilities = Arc::new(CapabilityStore::new(capabilities_path));
+            let broker = Arc::new(CredentialBroker::new(capabilities.clone(), Arc::new(NullSecretLookup)));
+            if let Err(e) = broker.start() {
+                eprintln!("[hearth] micro-app credential broker failed to start: {e}");
+            }
+            app.manage(MicroAppsState::new(Arc::new(MicroAppServer::new()), capabilities, broker));
+
             Ok(())
         })
         .build(tauri::generate_context!())
@@ -263,6 +305,13 @@ pub fn run() {
                 if let Some(state) = app_handle.try_state::<AgentState>() {
                     let host = state.host.clone();
                     tauri::async_runtime::block_on(host.dispose());
+                }
+                // Every running micro-app's Vite server + CSP proxy (Phase
+                // 6, tracking issue #27) — mirrors ipc.ts's own before-quit
+                // handler not leaking child processes/listeners past app
+                // exit.
+                if let Some(state) = app_handle.try_state::<MicroAppsState>() {
+                    state.stop_all();
                 }
             }
         });

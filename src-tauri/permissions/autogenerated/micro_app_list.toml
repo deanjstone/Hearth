@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-micro-app-list"
+description = "Enables the micro_app_list command without any pre-configured scope."
+commands.allow = ["micro_app_list"]
+
+[[permission]]
+identifier = "deny-micro-app-list"
+description = "Denies the micro_app_list command without any pre-configured scope."
+commands.deny = ["micro_app_list"]

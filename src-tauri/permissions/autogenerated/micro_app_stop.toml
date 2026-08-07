@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-micro-app-stop"
+description = "Enables the micro_app_stop command without any pre-configured scope."
+commands.allow = ["micro_app_stop"]
+
+[[permission]]
+identifier = "deny-micro-app-stop"
+description = "Denies the micro_app_stop command without any pre-configured scope."
+commands.deny = ["micro_app_stop"]

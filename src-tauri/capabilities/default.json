@@ -11,6 +11,14 @@
     "allow-self-mod-history",
     "allow-self-mod-undo",
     "allow-self-mod-redo",
-    "allow-frontend-ready"
+    "allow-frontend-ready",
+    "allow-micro-app-create",
+    "allow-micro-app-list",
+    "allow-micro-app-starters",
+    "allow-micro-app-start",
+    "allow-micro-app-stop",
+    "allow-micro-app-capabilities",
+    "allow-micro-app-approve",
+    "allow-micro-app-revoke"
   ]
 }

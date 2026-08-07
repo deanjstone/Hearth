@@ -17,6 +17,13 @@ tauri = { version = "2", features = [] }
 dirs = "6"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# Origin/hostname parsing for micro_apps/capabilities.rs's `normalizeHost`
+# port and micro_apps/broker.rs's target-URL validation (Phase 6, tracking
+# issue #27) — already an indirect dependency via tauri/hyper/ureq, made
+# direct rather than hand-rolling a URL parser for the RFC edge cases
+# (embedded credentials, IDNA, IPv6 literals) `normalizeHost` needs to
+# reject correctly.
+url = "2"
 # default-features off: the overlay client only ever posts to the local Vite dev
 # server over plain http://, so the tls stack ureq pulls in by default is dead
 # weight here. "tls" is re-added below for mcp/probe.rs's http/sse
@@ -52,8 +59,13 @@ tiny_http = "0.12"
 # turn_coordinator.rs) works even outside one.
 #
 # "io-util" adds `AsyncWriteExt`/`AsyncBufReadExt`/`BufReader`, needed by
-# mcp/probe.rs's newline-delimited JSON-RPC stdio handshake (Phase 5).
-tokio = { version = "1", features = ["sync", "process", "time", "macros", "io-util"] }
+# mcp/probe.rs's newline-delimited JSON-RPC stdio handshake (Phase 5) and by
+# micro_apps/csp_proxy.rs's `copy_bidirectional` WS-upgrade splice (Phase 6,
+# same shape spike/tauri-csp-proxy/ validated). "net" adds the
+# `TcpListener`/`TcpStream` that same proxy listens and dials upstream with —
+# micro_apps/broker.rs stays sync (tiny_http + ureq, matching bridge.rs's own
+# loopback server) and needs neither.
+tokio = { version = "1", features = ["sync", "process", "time", "macros", "io-util", "net"] }
 # Dyn-compatible async trait methods (Agent/AgentSession are used as trait
 # objects behind AgentHost) — Rust's native async-fn-in-traits isn't object-safe
 # yet, and hand-rolling Pin<Box<dyn Future>> everywhere is worse than one small,
@@ -78,6 +90,18 @@ fancy-regex = "0.13"
 # is what removes the `electron-rebuild` native-module-ABI tax node-pty paid
 # on every dependency bump.
 portable-pty = "0.9"
+
+# CSP reverse proxy (Phase 6, tracking issue #27) — one hyper-based proxy per
+# running micro-app, splicing Vite's HMR WebSocket upgrade through untouched
+# while stamping the authoritative Content-Security-Policy on normal
+# responses. Exactly the shape spike/tauri-csp-proxy/ (wayfinder ticket #22)
+# already validated on WebKitGTK; versions match that spike's Cargo.toml
+# verbatim rather than re-deriving a feature set. "full" on hyper covers both
+# server (http1) and client (http1) halves the proxy needs — the crate
+# doesn't split those finely enough below "full" to bother trimming.
+hyper = { version = "1", features = ["full"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+http-body-util = "0.1"
 
 # This port targets WSL2/Linux only (per spec #26's scope decision), so the
 # WebKitGTK-specific snapshot primitive (bridge.rs's snapshot_window) is

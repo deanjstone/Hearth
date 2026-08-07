@@ -18,7 +18,10 @@
 // actually reachable end-to-end. Phase 4 (tracking issue #27) adds `terminal`
 // (src-tauri/src/terminal_commands.rs), the `TerminalTab.tsx` PTY surface.
 // Phase 5 adds `mcp` (src-tauri/src/mcp_commands.rs), the MCP server
-// registry + read-only active-connectors view. Not the full ~90-method/20-namespace
+// registry + read-only active-connectors view. Phase 6 adds `microApps`
+// (src-tauri/src/micro_apps_commands.rs), the sandboxed micro-app gallery —
+// scaffold/list/start/stop plus the W6 egress-capability surface
+// `MicroAppFrame.tsx` drives. Not the full ~90-method/20-namespace
 // `HearthApi` surface (see spec #26's "IPC surface" decision — ported per
 // in-scope subsystem as it lands, not upfront). The cast below is
 // intentionally unsound today and will narrow to a real subset type, or fill
@@ -32,6 +35,7 @@ import { agent } from '../../electron/preload-tauri/agent.js'
 import { agentRuntime } from '../../electron/preload-tauri/agent-runtime.js'
 import { auth } from '../../electron/preload-tauri/auth.js'
 import { mcp } from '../../electron/preload-tauri/mcp.js'
+import { microApps } from '../../electron/preload-tauri/micro-apps.js'
 import { permission } from '../../electron/preload-tauri/permission.js'
 import { selfMod } from '../../electron/preload-tauri/self-mod.js'
 import { sessions } from '../../electron/preload-tauri/sessions.js'
@@ -57,5 +61,6 @@ if (typeof window !== 'undefined' && window.__TAURI__ && !window.hearth) {
     workspaces,
     terminal,
     mcp,
+    microApps,
   } as unknown as HearthApi
 }
