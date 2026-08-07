@@ -3,7 +3,10 @@
   "productName": "Hearth",
   "version": "0.1.0",
   "identifier": "ai.hearth.dev",
-  "build": { "devUrl": "http://localhost:5173" },
+  "build": {
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "pnpm run dev:tauri-frontend"
+  },
   "app": {
     "withGlobalTauri": true,
     "windows": [{ "title": "Hearth", "width": 1280, "height": 800, "url": "http://localhost:5173" }],

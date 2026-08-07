@@ -89,12 +89,18 @@ impl RoutineScheduler {
 }
 
 /// Drives `tick` on a real interval; the returned task should be aborted on
-/// app shutdown (mirrors `clearInterval` in `stop()`).
+/// app shutdown (mirrors `clearInterval` in `stop()`). Uses
+/// `tauri::async_runtime::spawn`, not `tokio::spawn` directly — `lib.rs`'s
+/// `setup()` hook (where this is called) runs outside any Tokio reactor
+/// context, so a bare `tokio::spawn` panics with "there is no reactor
+/// running"; Tauri's wrapper spawns onto its own managed runtime instead
+/// (same fix shape as `agent_commands.rs`'s own `tauri::async_runtime::spawn`
+/// calls).
 pub fn spawn_ticker(
     scheduler: Arc<RoutineScheduler>,
     interval: Duration,
-) -> tokio::task::JoinHandle<()> {
-    tokio::spawn(async move {
+) -> tauri::async_runtime::JoinHandle<()> {
+    tauri::async_runtime::spawn(async move {
         let mut ticker = tokio::time::interval(interval);
         loop {
             ticker.tick().await;
