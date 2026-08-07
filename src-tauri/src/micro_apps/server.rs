@@ -111,9 +111,21 @@ fn vite_bin(dir: &Path) -> PathBuf {
 /// therefore untrusted, and lifecycle scripts (postinstall et al.) run with
 /// full process privileges. Vite + React need no install scripts to
 /// function.
+///
+/// `--ignore-workspace`: `dir` (micro-apps/<name>) is deliberately NOT a
+/// member of this repo's own pnpm-workspace.yaml (each micro-app is its own
+/// isolated project, per this module's own header comment) — but it's still
+/// nested inside the repo's directory tree, so pnpm auto-detects the parent
+/// workspace root and, without this flag, treats the whole command as "the
+/// parent workspace is already satisfied" and silently does nothing for
+/// this subdirectory's own package.json (confirmed empirically: exits 0,
+/// prints "Already up to date", never creates this dir's own node_modules).
+/// Found via e2e-tests/specs/micro-app-csp-proxy.spec.js, the first thing to
+/// actually run this against a real micro-app nested in the real workspace
+/// rather than a `tempfile::tempdir()` fixture living outside it.
 pub async fn install_deps(dir: &Path) -> Result<(), String> {
     let output = Command::new("pnpm")
-        .args(["install", "--ignore-scripts"])
+        .args(["install", "--ignore-scripts", "--ignore-workspace"])
         .current_dir(dir)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
