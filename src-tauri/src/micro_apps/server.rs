@@ -236,6 +236,25 @@ impl MicroAppServer {
         let stdout = child.stdout.take().expect("vite spawned with piped stdout");
         let mut lines = BufReader::new(stdout).lines();
 
+        // Drain stderr for the process's whole lifetime, not just while
+        // waiting for the URL. `Stdio::piped()` gives it a fixed-size OS
+        // pipe buffer (~64KB on Linux) — if nothing ever reads it and vite
+        // writes enough (deprecation/engine-version warnings, more of them
+        // observed in CI than a typical local run), the write() blocks and
+        // vite hangs before ever printing its "Local:" URL to stdout. Found
+        // via e2e-tests/specs/micro-app-csp-proxy.spec.js failing in CI
+        // with "did not print a dev URL within 30s" while the same fixture
+        // started in under a second locally. Logged rather than silently
+        // discarded so a real crash's error output isn't lost.
+        let stderr = child.stderr.take().expect("vite spawned with piped stderr");
+        let stderr_app_name = name.clone();
+        tokio::spawn(async move {
+            let mut stderr_lines = BufReader::new(stderr).lines();
+            while let Ok(Some(line)) = stderr_lines.next_line().await {
+                eprintln!("[hearth] micro-app {stderr_app_name} (vite stderr): {line}");
+            }
+        });
+
         let read_loop = async {
             loop {
                 match lines.next_line().await {
