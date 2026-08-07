@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-sessions-search"
+description = "Enables the sessions_search command without any pre-configured scope."
+commands.allow = ["sessions_search"]
+
+[[permission]]
+identifier = "deny-sessions-search"
+description = "Denies the sessions_search command without any pre-configured scope."
+commands.deny = ["sessions_search"]
