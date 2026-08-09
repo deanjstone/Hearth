@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-agent-runtime-recheck"
+description = "Enables the agent_runtime_recheck command without any pre-configured scope."
+commands.allow = ["agent_runtime_recheck"]
+
+[[permission]]
+identifier = "deny-agent-runtime-recheck"
+description = "Denies the agent_runtime_recheck command without any pre-configured scope."
+commands.deny = ["agent_runtime_recheck"]

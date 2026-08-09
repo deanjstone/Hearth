@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-personality-set"
+description = "Enables the personality_set command without any pre-configured scope."
+commands.allow = ["personality_set"]
+
+[[permission]]
+identifier = "deny-personality-set"
+description = "Denies the personality_set command without any pre-configured scope."
+commands.deny = ["personality_set"]

@@ -1,10 +1,12 @@
 # Hearth
 
 Hearth is a Linux (WSL2) desktop client for coding agents (Claude Code or Codex) that can
-edit its own running interface. The renderer is served by a live Vite dev server,
-so when the agent edits Hearth's own source the change hot-reloads into the window
-with no restart, and every edit is a git commit you can revert. The agent can also
-see and drive the app the way you would, through a small MCP server it is given.
+edit its own running interface. It's a Rust/Tauri shell (ported from an earlier
+Electron build — see [docs/decisions/](docs/decisions/)) around a React renderer
+served by a live Vite dev server, so when the agent edits Hearth's own source the
+change hot-reloads into the window with no restart, and every edit is a git commit
+you can revert. The agent can also see and drive the app the way you would, through
+a small MCP server it is given.
 
 The one example that captures it: say "add a Stats item to the sidebar," and the
 agent edits the app's own source, the sidebar reshapes in front of you, and the
@@ -36,13 +38,16 @@ stay on your machine.
 
 There is no packaged build for Linux; this is a dev-mode-only port. You need
 Node 22, [pnpm](https://pnpm.io) (version pinned in `package.json`'s
-`packageManager` field), `build-essential` and `python3` (for the `node-pty`
-native rebuild), and a locally-authenticated agent.
+`packageManager` field), a Rust toolchain plus `tauri-cli`
+(`cargo install tauri-cli --locked`), WebKitGTK dev libraries
+(`libwebkit2gtk-4.1-dev` on Debian/Ubuntu), `build-essential` and `python3`
+(for the `node-pty` native rebuild, only needed if you also run the retired
+Electron build via `pnpm dev:electron`), and a locally-authenticated agent.
 
 ```bash
 pnpm install
 pnpm run routes:gen             # generate the TanStack route tree (needed before typecheck from a fresh clone)
-pnpm run dev                    # opens the app with live HMR (Claude backend)
+pnpm run dev                    # builds the Rust/Tauri shell + starts the Vite dev server, with live HMR (Claude backend)
 ```
 
 Same app on the Codex backend:
@@ -90,12 +95,17 @@ Safety comes from recoverability, not from fencing the agent out.
 
 ## Architecture
 
-The full design and rationale is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-Domain vocabulary is in [CONCEPTS.md](CONCEPTS.md). The self-evolution engine lives
-in `electron/main/self-mod/`; `scope-guard.ts` and `boot-watchdog.ts` are the two
-files worth reading first. Packaging and auto-update are covered in
-[docs/AUTO-UPDATE.md](docs/AUTO-UPDATE.md) and
-[docs/PACKAGING-V3-PLAN.md](docs/PACKAGING-V3-PLAN.md).
+The shell is Rust/Tauri, ported from an earlier Electron build — see
+[ADR-001](docs/decisions/adr-001-electron-to-tauri-cutover.md) for the cutover
+decision and [docs/decisions/rust-tauri-feasibility.md](docs/decisions/rust-tauri-feasibility.md)
+for the per-subsystem port rationale. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+still describes the pre-cutover Electron design in detail and is flagged stale
+at the top pending a full rewrite; domain vocabulary in [CONCEPTS.md](CONCEPTS.md)
+still applies unchanged. The self-evolution engine now lives in
+`src-tauri/src/selfmod/`; `scope_guard.rs` and `boot_watchdog.rs` are the two
+files worth reading first. Packaging and auto-update (`docs/AUTO-UPDATE.md`,
+`docs/PACKAGING-V3-PLAN.md`) describe the retired Electron build's plans and
+remain out of scope for the Tauri MVP.
 
 ## License
 

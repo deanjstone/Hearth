@@ -33,3 +33,88 @@ jobs:
       - run: pnpm run typecheck
       - run: pnpm run lint
       - run: pnpm run test
+
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      # libappindicator3-dev and libayatana-appindicator3-dev conflict on
+      # noble/24.04 runners — only the ayatana one is needed there.
+      - name: Install Tauri Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev \
+            librsvg2-dev patchelf libxdo-dev libssl-dev
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: cargo fmt --check --manifest-path src-tauri/Cargo.toml
+      - run: cargo check --manifest-path src-tauri/Cargo.toml
+      - run: cargo clippy --all-targets --manifest-path src-tauri/Cargo.toml
+      - run: cargo test --manifest-path src-tauri/Cargo.toml
+
+  # Real WebKitGTK coverage (Hearth#27 Phase 1's own exit criteria, per the
+  # testing strategy locked in #25/#37): the HMR self-mod swap, undo/redo,
+  # and the boot-watchdog revert, all driven against the actual built app via
+  # tauri-driver + WebDriverIO — not the spike/ marker-harness, which stays a
+  # one-off risk-proving tool, not the permanent suite. Also covers the
+  # view_app/eval_js bridge (Phase 2) and, as of Phase 6, the micro-app CSP
+  # proxy + permission-request deny-all (micro-app-csp-proxy.spec.js) — the
+  # third and last WebKitGTK-coupled behavior the testing strategy names.
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Tauri + WebKitGTK Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev webkit2gtk-driver xvfb \
+            libayatana-appindicator3-dev librsvg2-dev patchelf libxdo-dev libssl-dev \
+            libgtk-3-0 libasound2t64 libatk-bridge2.0-0 libcups2
+          # @wdio/tauri-service's own startup diagnostics flag these as missing on a
+          # bare ubuntu-latest image (libasound2 was renamed libasound2t64 on noble).
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      # tauri-cli's own build is the dominant cost here (~3-4 min) — cache the
+      # installed binaries directly, keyed on the pinned Cargo.lock versions.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/cargo-tauri
+            ~/.cargo/bin/tauri-driver
+          key: tauri-cli-${{ runner.os }}-${{ hashFiles('src-tauri/Cargo.lock') }}
+      - name: Install tauri-cli and tauri-driver
+        run: |
+          command -v cargo-tauri >/dev/null || cargo install tauri-cli --locked
+          command -v tauri-driver >/dev/null || cargo install tauri-driver --locked
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm run routes:gen
+      - name: Build the Tauri debug binary
+        run: cd src-tauri && cargo tauri build --debug --no-bundle
+      - name: Start the Tauri frontend dev server
+        run: |
+          nohup pnpm run dev:tauri-frontend > vite-tauri-frontend.log 2>&1 &
+          disown
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:5173/ >/dev/null && exit 0
+            sleep 1
+          done
+          echo "Vite dev server never came up on :5173" >&2
+          cat vite-tauri-frontend.log >&2
+          exit 1
+      - name: Configure git for the e2e fixture commits
+        run: |
+          git config user.email "e2e@hearth.dev"
+          git config user.name "Hearth E2E"
+      - run: xvfb-run -a pnpm run test
+        working-directory: e2e-tests

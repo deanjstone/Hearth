@@ -1,0 +1,16 @@
+<!--
+  Fixture for e2e-tests/specs/micro-app-csp-proxy.spec.js (Phase 6, tracking
+  issue #27) — NOT a real micro-app. Deliberately dependency-free beyond
+  `vite` itself (no React) so its one-time `pnpm install` during the e2e job
+  stays fast. Do not scaffold a real micro-app on top of this directory.
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>e2e csp fixture</title>
+  </head>
+  <body>
+    <h1 id="marker">e2e-csp-fixture-loaded</h1>
+  </body>
+</html>

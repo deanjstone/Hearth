@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-connectors-active"
+description = "Enables the connectors_active command without any pre-configured scope."
+commands.allow = ["connectors_active"]
+
+[[permission]]
+identifier = "deny-connectors-active"
+description = "Denies the connectors_active command without any pre-configured scope."
+commands.deny = ["connectors_active"]

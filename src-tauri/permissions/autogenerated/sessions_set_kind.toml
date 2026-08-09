@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-sessions-set-kind"
+description = "Enables the sessions_set_kind command without any pre-configured scope."
+commands.allow = ["sessions_set_kind"]
+
+[[permission]]
+identifier = "deny-sessions-set-kind"
+description = "Denies the sessions_set_kind command without any pre-configured scope."
+commands.deny = ["sessions_set_kind"]

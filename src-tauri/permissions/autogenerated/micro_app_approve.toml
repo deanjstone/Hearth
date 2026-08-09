@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-micro-app-approve"
+description = "Enables the micro_app_approve command without any pre-configured scope."
+commands.allow = ["micro_app_approve"]
+
+[[permission]]
+identifier = "deny-micro-app-approve"
+description = "Denies the micro_app_approve command without any pre-configured scope."
+commands.deny = ["micro_app_approve"]

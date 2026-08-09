@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-mcp-update"
+description = "Enables the mcp_update command without any pre-configured scope."
+commands.allow = ["mcp_update"]
+
+[[permission]]
+identifier = "deny-mcp-update"
+description = "Denies the mcp_update command without any pre-configured scope."
+commands.deny = ["mcp_update"]

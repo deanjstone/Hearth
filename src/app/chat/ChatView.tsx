@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { AgentKind, PermissionRequest, PromptImage, SessionUpdate } from '../../../electron/shared/protocol'
+import type { AgentKind, AgentRuntimeStatus, PermissionRequest, PromptImage, SessionUpdate } from '../../../electron/shared/protocol'
+import { AgentRuntimeUnavailable } from '@/shell/AgentRuntimeUnavailable'
 import { FlameMark, ThinkingEmber } from '@/shell/Mascot'
 import { Icon } from '@/shell/Icon'
 import { useShell } from '@/shell/store'
@@ -47,6 +48,13 @@ export function ChatView() {
   const [transcript, setTranscript] = useState<TranscriptState>(EMPTY_TRANSCRIPT)
   const msgs = transcript.msgs
   const [backend, setBackend] = useState<AgentKind>('claude')
+  // Chunk 4 (spec #48): the startup Node/adapter check gates this surface
+  // alone — self-mod, the terminal, and every other subsystem are unaffected
+  // by a failed check, so this early-returns below rather than blocking boot.
+  // Starts 'checking' (not optimistically 'ok') so the composer never briefly
+  // renders usable before the async check result is actually known — user
+  // story 29 asks for a blocking error, not a flash of a working surface.
+  const [runtimeStatus, setRuntimeStatus] = useState<'checking' | AgentRuntimeStatus>('checking')
   const nextId = useRef(0)
   const turnStart = useRef(0) // wall-clock turn start, for the "Worked · Ns" badge
   // Non-null while the active session's transcript is replaying: live updates
@@ -121,6 +129,14 @@ export function ChatView() {
       }),
     )
   }
+
+  useEffect(() => {
+    let live = true
+    void window.hearth.agentRuntime.status().then((s) => live && setRuntimeStatus(s))
+    return () => {
+      live = false
+    }
+  }, [])
 
   useEffect(() => {
     void window.hearth.agent.getBackend().then(setBackend)
@@ -288,6 +304,13 @@ export function ChatView() {
 
   const lastUser = [...msgs].reverse().find((x) => x.role === 'user')
   const lastUserText = lastUser && lastUser.role === 'user' ? lastUser.text : null
+
+  if (runtimeStatus === 'checking') {
+    return <div className="chat-col" data-screen-label="Chat" />
+  }
+  if (runtimeStatus.status !== 'ok') {
+    return <AgentRuntimeUnavailable status={runtimeStatus} onStatusChange={setRuntimeStatus} />
+  }
 
   return (
     <div className="chat-col" data-screen-label="Chat">

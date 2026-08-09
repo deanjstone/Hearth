@@ -3,7 +3,7 @@
 
 import { contextBridge, ipcRenderer } from 'electron'
 import { HEARTH_CHANNELS as CH } from '../shared/channels.js'
-import type { ActiveConnectors, AgentErrorPayload, AgentKind, AgentUpdatePayload, AuthState, AvailableCommand, BackendStatus, BrowserCursorEvent, ConfigOption, CreateRoutineInput, ModelState, ModeState, PermissionRequestPayload, PromptCapabilities, PromptImage, Routine, UpdateStatus, Usage, WorkspaceKind } from '../shared/protocol.js'
+import type { ActiveConnectors, AgentErrorPayload, AgentKind, AgentRuntimeStatus, AgentUpdatePayload, AuthState, AvailableCommand, BackendStatus, BrowserCursorEvent, ConfigOption, CreateRoutineInput, ModelState, ModeState, PermissionRequestPayload, PromptCapabilities, PromptImage, Routine, UpdateStatus, Usage, WorkspaceKind } from '../shared/protocol.js'
 import type { SecretInfo } from '../main/secrets/secret-store.js'
 import type { McpServerConfig, McpServerInput } from '../main/mcp/registry.js'
 import type { ProbeResult } from '../main/mcp/probe.js'
@@ -87,6 +87,15 @@ const api = {
       ipcRenderer.on(CH.agentError, handler)
       return () => void ipcRenderer.off(CH.agentError, handler)
     },
+  },
+  // Startup Node/adapter availability (Chunk 4, spec #48) — Tauri-only in
+  // practice, since Electron spawns adapters via ELECTRON_RUN_AS_NODE and so
+  // never fails this check. Kept here as a constant so the renderer's gating
+  // component needs no Electron/Tauri branching of its own; no IPC round
+  // trip needed since the answer never varies.
+  agentRuntime: {
+    status: (): Promise<AgentRuntimeStatus> => Promise.resolve({ status: 'ok' }),
+    recheck: (): Promise<AgentRuntimeStatus> => Promise.resolve({ status: 'ok' }),
   },
   permission: {
     // Surface a mid-turn permission ask; the unsubscribe fn is returned.
