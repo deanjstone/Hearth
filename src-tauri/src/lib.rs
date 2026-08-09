@@ -57,6 +57,7 @@ use selfmod::service::SelfModService;
 use selfmod_commands::AppState;
 use sessions::store::SessionStore;
 use sessions_commands::SessionState;
+use std::path::Path;
 use std::sync::{Arc, Mutex, OnceLock};
 use tauri::{Emitter, Manager};
 use turn_coordinator::TurnCoordinator;
@@ -149,10 +150,19 @@ pub fn run() {
         ])
         .setup(|app| {
             // Not yet packaged (bundle.active is false in tauri.conf.json) — dev
-            // only for now, so the dev branch of TS's REPO_ROOT resolution
-            // (`process.cwd()`) is the whole story; a packaged build's
-            // userData-seeded workspace path is future work.
-            let repo_root = std::env::current_dir()?;
+            // only for now, so a packaged build's userData-seeded workspace
+            // path is future work. Anchor on CARGO_MANIFEST_DIR (baked in at
+            // compile time as this crate's own directory, i.e. `src-tauri/`)
+            // rather than `std::env::current_dir()`: the Phase 7 cutover
+            // made `pnpm dev` run `cd src-tauri && cargo tauri dev`, so the
+            // process cwd is `src-tauri/` itself, not the repo root — using
+            // it here silently pointed self-mod, the agent adapter
+            // resolver, and the agent's own session cwd at a directory with
+            // no `.git` and no `node_modules`, breaking all three.
+            let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("src-tauri crate always has a parent directory (the repo root)")
+                .to_path_buf();
 
             // Boot watchdog (W6): if the previous self-mod restart never reached
             // ready, it bricked boot — auto-revert that commit before the window
