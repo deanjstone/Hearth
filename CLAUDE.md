@@ -1,5 +1,11 @@
 # Working in Hearth
 
+## Status
+
+**ARCHIVED 2026-08-11.** The Hearth evaluation — including the successful Rust/Tauri port (merged to `main` 2026-08-10, PR #62) — is concluded and will not be pursued further. No successor. The self-mod / self-editing-UI capability proven out here may be revisited in a future project.
+
+---
+
 Hearth is a self-evolving desktop client for coding agents. When you run inside
 it, **this repo is the running app** and you may be asked to change its own UI.
 
